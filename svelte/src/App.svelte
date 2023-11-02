@@ -21,6 +21,20 @@
   const WALL_ICON = "bi-square-fill";
   const BOX_ICON = "bi-box2-fill";
   const ICONS = [COIN_ICON, PIT_ICON, GOAL_ICON, WALL_ICON, BOX_ICON];
+  const ACTION_ICONS = [
+    "bi-arrow-left",
+    "bi-arrow-right",
+    "bi-arrow-up",
+    "bi-arrow-down",
+  ];
+
+  const reset = () => {
+    cells = [...ORIG_CELLS.map((r) => [...r])];
+    agentPos = [0, 3];
+    score = 0;
+    running = true;
+    transitions = [];
+  };
 
   let cells = [...ORIG_CELLS.map((r) => [...r])];
   type Position = [number, number];
@@ -30,31 +44,48 @@
   const onKeyDown = (e: KeyboardEvent) => {
     switch (e.code) {
       case "ArrowUp":
-        moveTo(0, -1);
+        step(2);
         break;
       case "ArrowDown":
-        moveTo(0, 1);
+        step(3);
         break;
       case "ArrowLeft":
-        moveTo(-1, 0);
+        step(0);
         break;
       case "ArrowRight":
-        moveTo(1, 0);
+        step(1);
         break;
       case "KeyR":
-        cells = [...ORIG_CELLS.map((r) => [...r])];
-        agentPos = [0, 3];
-        score = 0;
-        running = true;
+        reset();
         break;
     }
   };
   const isBorder = (x: number, y: number) =>
     x < 0 || x >= rowLen || y < 0 || y >= rowLen;
-  const moveTo = (dx: number, dy: number) => {
+  const step = (action: number) => {
     if (running) {
+      const oldGameState = [...cells.map((r) => [...r])];
+      let dx = 0,
+        dy = 0;
+      switch (action) {
+        case 0:
+          dx = -1;
+          break;
+        case 1:
+          dx = 1;
+          break;
+        case 2:
+          dy = -1;
+          break;
+        case 3:
+          dy = 1;
+          break;
+      }
+
       const newX = agentPos[0] + dx;
       const newY = agentPos[1] + dy;
+      let reward = 0;
+      let done = false;
 
       // Moving into the border.
       if (isBorder(newX, newY)) {
@@ -86,23 +117,31 @@
 
       // Moving into a coin.
       if (cell === COIN) {
-        score += 1;
+        reward += 1;
         cells[newY][newX] = EMPTY;
       }
 
-      agentPos = [newX, newY];
-
       // Moving into the goal.
       if (cell === GOAL) {
-        score += 10;
+        reward += 10;
+        done = true;
         endEpisode();
       }
 
       // Moving into a pit.
       if (cell == PIT) {
-        score -= 10;
+        reward -= 10;
+        done = true;
         endEpisode();
       }
+
+      score += reward;
+      const oldAgentPos = agentPos;
+      agentPos = [newX, newY];
+      transitions = [
+        ...transitions,
+        [[oldGameState, oldAgentPos], action, reward, done],
+      ];
     }
   };
 
@@ -110,9 +149,27 @@
   const endEpisode = () => {
     running = false;
   };
+
+  const toTransition = (i: number) => {
+    if (i > 0) {
+      cells = [...transitions[i][0][0].map((r) => [...r])];
+      agentPos = transitions[i][0][1];
+      score = transitions
+        .slice(0, i)
+        .map((t) => t[2])
+        .reduce((prev, curr) => prev + curr);
+      running = true;
+      transitions = transitions.slice(0, i);
+    } else {
+      reset();
+    }
+  };
+
+  type GameState = [number[][], Position];
+  let transitions: [GameState, number, number, boolean][] = [];
 </script>
 
-<main>
+<main class="color-dark">
   <h1>Deep Q Network Demo</h1>
   <div class="episode-status bg-dark color-light">
     {running ? "RUNNING..." : "EPISODE END"}
@@ -126,8 +183,8 @@
             <i
               class="bi {x === agentPos[0] && y === agentPos[1]
                 ? AGENT_ICON
-                : cells[y][x] > 0
-                ? ICONS[cells[y][x] - 1]
+                : cell > 0
+                ? ICONS[cell - 1]
                 : ''}"
             />
           </div>
@@ -136,6 +193,44 @@
     {/each}
   </div>
   <p>Score: {score}</p>
+  <div>
+    <h1>Manual</h1>
+    <p>Use the arrow keys to move. Press <b>R</b> to restart.</p>
+    <div class="transitions">
+      {#each transitions as transition, i}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <div class="transition" on:click={() => toTransition(i)}>
+          <div class="state">
+            {#each transition[0][0] as row, y}
+              {#each row as cell, x}
+                <div class="cell-mini bg-primary">
+                  <div class="cell-icon-mini">
+                    <i
+                      class="bi {x === transition[0][1][0] &&
+                      y === transition[0][1][1]
+                        ? AGENT_ICON
+                        : cell > 0
+                        ? ICONS[cell - 1]
+                        : ''}"
+                    />
+                  </div>
+                </div>
+              {/each}
+            {/each}
+          </div>
+          <div class="action">
+            <i class="bi {ACTION_ICONS[transition[1]]}" />
+          </div>
+          <div class="transition-text">
+            {transition[2] > 0 ? "+" : ""}{transition[2]}
+          </div>
+          {#if transition[3]}
+            <div class="transition-text">Done</div>
+          {/if}
+        </div>
+      {/each}
+    </div>
+  </div>
   <!-- <p>{bindings.add(6, 7)}</p> -->
 </main>
 
@@ -148,7 +243,6 @@
 
   .game {
     width: 41rem;
-    height: 41rem;
     margin: 0;
     padding: 0;
     display: flex;
@@ -165,6 +259,49 @@
     font-size: 5rem;
     text-align: center;
     align-content: center;
+  }
+
+  .transitions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .state {
+    display: flex;
+    flex-wrap: wrap;
+    width: 8rem;
+  }
+
+  .cell-mini {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .cell-icon-mini {
+    font-size: 1rem;
+    text-align: center;
+    align-content: center;
+  }
+  .action {
+    padding: 1rem;
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+  }
+
+  .transition {
+    display: flex;
+    align-items: center;
+    font-size: 2rem;
+    padding: 1rem;
+    margin: 1rem;
+    box-shadow: 0 0 0.2rem black;
+    cursor: pointer;
+  }
+
+  .transition-text {
+    display: flex;
+    margin: 1rem;
   }
 
   .episode-status {
