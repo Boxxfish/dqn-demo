@@ -1,3 +1,5 @@
+pub mod env;
+
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
