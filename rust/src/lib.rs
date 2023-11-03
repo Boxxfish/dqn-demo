@@ -1,4 +1,5 @@
 mod env;
+mod dqn;
 mod replay_buffer;
 
 use wasm_bindgen::prelude::*;

@@ -4,7 +4,7 @@ use rand::Rng;
 
 /// A replay buffer for use with off policy algorithms.
 /// Stores transitions and generates mini batches.
-struct ReplayBuffer {
+pub struct ReplayBuffer {
     pub capacity: usize,
     pub next: usize,
     pub states: Tensor,
@@ -46,7 +46,7 @@ impl ReplayBuffer {
 
     /// Inserts a transition from each environment into the buffer. Make sure
     /// more data than steps aren't inserted.
-    fn insert_step(
+    pub fn insert_step(
         &mut self,
         states: Tensor,
         next_states: Tensor,
@@ -85,7 +85,10 @@ impl ReplayBuffer {
     }
 
     /// Generates minibatches of experience.
-    fn sample(&self, batch_size: usize) -> Result<(Tensor, Tensor, Tensor, Tensor, Tensor), Error> {
+    pub fn sample(
+        &self,
+        batch_size: usize,
+    ) -> Result<(Tensor, Tensor, Tensor, Tensor, Tensor), Error> {
         let mut rng = rand::thread_rng();
         let indices = Tensor::new(
             (0..batch_size)
