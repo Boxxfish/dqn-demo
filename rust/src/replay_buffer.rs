@@ -16,7 +16,7 @@ pub struct ReplayBuffer {
 }
 
 impl ReplayBuffer {
-    fn new(state_shape: Shape, action_masks_shape: Shape, capacity: usize) -> Self {
+    pub fn new(state_shape: Shape, capacity: usize) -> Self {
         let s = move || -> Result<_, candle_core::Error> {
             let k = DType::F32;
             let state_shape = [&[capacity], state_shape.dims()].concat();
@@ -63,7 +63,8 @@ impl ReplayBuffer {
                     .collect::<Vec<_>>(),
                 &d,
             )?;
-            *self.states.i(&indices).as_mut().unwrap() = states;
+            self.states.i(&indices)?.clone_from(&states);
+            println!("{}", self.states.i(&indices)?);
             *self.next_states.i(&indices).as_mut().unwrap() = next_states;
             *self.actions.i(&indices).as_mut().unwrap() = actions;
             *self.rewards.i(&indices).as_mut().unwrap() = Tensor::new(rewards, &d)?;
