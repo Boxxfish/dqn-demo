@@ -177,17 +177,17 @@
         switch (cell) {
           case EMPTY:
             break;
-          case WALL:
-            state[2 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
-            break;
           case COIN:
             state[0 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
             break;
-          case BOX:
-            state[3 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
-            break;
           case PIT:
             state[1 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            break;
+          case WALL:
+            state[2 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            break;
+          case BOX:
+            state[3 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
             break;
           case GOAL:
             state[4 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
@@ -195,18 +195,19 @@
         }
       }
     }
-
-    for (let y = 0; y < gridSize; y++) {
-      for (let x = 0; x < gridSize; x++) {
-        if (x >= 1 && x < gridSize - 1 && y >= 1 && y < gridSize - 1) {
-          continue;
-        }
-        state[2 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
-      }
-    }
     state[
       5 * gridSize * gridSize + (agentPos[1] + 1) * gridSize + (agentPos[0] + 1)
     ] = 1;
+
+    // Outer border
+    for (let y = 0; y < 6; y++) {
+      for (let x = 0; x < 6; x++) {
+        if (x >= 1 && x < gridSize - 1 && y >= 1 && y < gridSize - 1) {
+          continue;
+        }
+        state[2 * gridSize * gridSize + y * gridSize + x] = 1;
+      }
+    }
     return state;
   };
   $: state = getState(cells, agentPos);

@@ -44,7 +44,7 @@ impl GridEnv {
         let mut rng = rand::thread_rng();
         let ref_grid = loop {
             let mut ref_grid: Vec<_> = (0..(GRID_SIZE * GRID_SIZE))
-                .map(|_| rng.gen_range(0..(BOX_IDX + 1)))
+                .map(|_| rng.gen_range(0..(BOX_IDX + 2)))
                 .collect();
             for y in 0..GRID_SIZE {
                 for x in 0..GRID_SIZE {
@@ -54,7 +54,11 @@ impl GridEnv {
                     ref_grid[y * GRID_SIZE + x] = WALL_IDX + 1;
                 }
             }
-            if ref_grid.iter().filter(|&&c| c == 0).count() > 2 {
+            if ref_grid.iter().filter(|&&c| c == 0).count() > 2
+                && ref_grid.iter().filter(|&&c| c == WALL_IDX + 1).count() < 23
+                && ref_grid.iter().filter(|&&c| c == PIT_IDX + 1).count() < 3
+                && ref_grid.iter().filter(|&&c| c == BOX_IDX + 1).count() < 3
+            {
                 break ref_grid;
             }
         };
@@ -144,6 +148,36 @@ impl GridEnv {
         state.push(goal_layer);
         state.push(agent_layer);
         state
+    }
+
+    pub fn render(&self) {
+        for y in 0..GRID_SIZE {
+            for x in 0..GRID_SIZE {
+                if self.grid[COIN_IDX][y][x] {
+                    print!("@");
+                }
+                else if self.grid[PIT_IDX][y][x] {
+                    print!("!");
+                }
+                else if self.grid[WALL_IDX][y][x] {
+                    print!("*");
+                }
+                else if self.grid[BOX_IDX][y][x] {
+                    print!("O");
+                }
+                else if self.goal_pos == (x, y) {
+                    print!("G");
+                }
+                else if self.agent_pos == (x, y) {
+                    print!("A");
+                }
+                else {
+                    print!(" ");
+                }
+            }
+            println!();
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
 fn is_border(x: i32, y: i32) -> bool {
