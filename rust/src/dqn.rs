@@ -1,5 +1,5 @@
 use anyhow::Result;
-use candle_core::{backprop::GradStore, Device, IndexOp, Module};
+use candle_core::{backprop::GradStore, DType, Device, IndexOp, Module};
 use candle_nn::{Optimizer, VarBuilder, VarMap};
 
 use crate::replay_buffer::ReplayBuffer;
@@ -42,7 +42,8 @@ pub fn train_dqn<M: Module, O: Optimizer>(
                     .forward(&states)?
                     .detach()?
                     .gather(&next_actions.unsqueeze(1)?, 1)?
-                    * (1. - &dones.unsqueeze(1)?))?
+                    .to_dtype(DType::F32)?
+                    * (1. - &dones.unsqueeze(1)?.to_dtype(DType::F32)?))?
                     .squeeze(1)?)?;
         // };
         let diff = (q_net

@@ -1,5 +1,5 @@
 use anyhow::{Error, Result};
-use candle_core::{DType, IndexOp, Shape, Tensor};
+use candle_core::{DType, Device, IndexOp, Shape, Tensor};
 use rand::Rng;
 
 /// A replay buffer for use with off policy algorithms.
@@ -7,26 +7,26 @@ use rand::Rng;
 pub struct ReplayBuffer {
     pub capacity: usize,
     pub next: usize,
-    pub states: Tensor,
-    pub next_states: Tensor,
-    pub actions: Tensor,
-    pub rewards: Tensor,
-    pub dones: Tensor,
+    pub states: Vec<Tensor>,
+    pub next_states: Vec<Tensor>,
+    pub actions: Vec<Tensor>,
+    pub rewards: Vec<f32>,
+    pub dones: Vec<bool>,
     pub filled: bool,
 }
 
 impl ReplayBuffer {
     pub fn new(state_shape: Shape, capacity: usize) -> Self {
         let s = move || -> Result<_, candle_core::Error> {
-            let k = DType::F32;
-            let state_shape = [&[capacity], state_shape.dims()].concat();
-            let d = candle_core::Device::Cpu;
-            let states = Tensor::zeros(state_shape.clone(), k, &d)?;
-            let next_states = Tensor::zeros(state_shape, k, &d)?;
-            let actions = Tensor::zeros(&[capacity], DType::I64, &d)?;
-            let rewards = Tensor::zeros(&[capacity], k, &d)?;
+            // let k = DType::F32;
+            // let state_shape = [&[capacity], state_shape.dims()].concat();
+            // let d = candle_core::Device::Cpu;
+            let states = Vec::new();
+            let next_states = Vec::new();
+            let actions = Vec::new();
+            let rewards = Vec::new();
             // Technically this is the "terminated" flag
-            let dones = Tensor::zeros(&[capacity], k, &d)?;
+            let dones = Vec::new();
             let filled = false;
             let next = 0;
             Ok(Self {
@@ -57,25 +57,25 @@ impl ReplayBuffer {
         move || -> Result<_> {
             let batch_size = dones.len();
             let d = candle_core::Device::Cpu;
-            let indices = Tensor::new(
-                (self.next..(self.next + batch_size))
-                    .map(|i| (i % self.capacity) as u32)
-                    .collect::<Vec<_>>(),
-                &d,
-            )?;
-            self.states.i(&indices)?.clone_from(&states);
-            println!("{}", self.states.i(&indices)?);
-            *self.next_states.i(&indices).as_mut().unwrap() = next_states;
-            *self.actions.i(&indices).as_mut().unwrap() = actions;
-            *self.rewards.i(&indices).as_mut().unwrap() = Tensor::new(rewards, &d)?;
-            *self.dones.i(&indices).as_mut().unwrap() = Tensor::new(
-                dones
-                    .iter()
-                    .map(|x| if *x { 1. } else { 0. })
-                    .collect::<Vec<f32>>()
-                    .as_slice(),
-                &d,
-            )?;
+            let indices = ((self.next..(self.next + batch_size))
+                .map(|i| (i % self.capacity) as usize)
+                .collect::<Vec<_>>());
+            for (val_i, &i) in indices.iter().enumerate() {
+                if self.filled {
+                    self.states[i] = states.i(val_i)?;
+                    self.next_states[i] = next_states.i(val_i)?;
+                    self.actions[i] = actions.i(val_i)?;
+                    self.rewards[i] = rewards[val_i];
+                    self.dones[i] = dones[val_i];
+                }
+                else {
+                    self.states.push(states.i(val_i)?);
+                    self.next_states.push(next_states.i(val_i)?);
+                    self.actions.push(actions.i(val_i)?);
+                    self.rewards.push(rewards[val_i]);
+                    self.dones.push(dones[val_i]);
+                }
+            }
             self.next = (self.next + batch_size) % self.capacity;
             if self.next == 0 {
                 self.filled = true;
@@ -91,23 +91,27 @@ impl ReplayBuffer {
         batch_size: usize,
     ) -> Result<(Tensor, Tensor, Tensor, Tensor, Tensor), Error> {
         let mut rng = rand::thread_rng();
-        let indices = Tensor::new(
-            (0..batch_size)
-                .map(|_| rng.gen_range(0..self.capacity) as u32)
-                .collect::<Vec<_>>(),
-            &candle_core::Device::Cpu,
-        )?;
-        let rand_states = self.states.index_select(&indices, 0)?;
-        let rand_next_states = self.next_states.index_select(&indices, 0)?;
-        let rand_actions = self.actions.index_select(&indices, 0)?;
-        let rand_rewards = self.rewards.index_select(&indices, 0)?;
-        let rand_dones = self.dones.index_select(&indices, 0)?;
+        let indices = (0..batch_size)
+            .map(|_| rng.gen_range(0..self.capacity) as usize)
+            .collect::<Vec<_>>();
+        let mut rand_states_vec = Vec::new();
+        let mut rand_next_states_vec = Vec::new();
+        let mut rand_actions_vec = Vec::new();
+        let mut rand_rewards_vec = Vec::new();
+        let mut rand_dones_vec = Vec::new();
+        for i in indices {
+            rand_states_vec.push(&self.states[i]);
+            rand_next_states_vec.push(&self.next_states[i]);
+            rand_actions_vec.push(&self.actions[i]);
+            rand_rewards_vec.push(self.rewards[i]);
+            rand_dones_vec.push(if self.dones[i] { 1. } else { 0. });
+        }
         Ok((
-            rand_states,
-            rand_next_states,
-            rand_actions,
-            rand_rewards,
-            rand_dones,
+            Tensor::stack(&rand_states_vec, 0)?,
+            Tensor::stack(&rand_next_states_vec, 0)?,
+            Tensor::stack(&rand_actions_vec, 0)?,
+            Tensor::new(rand_rewards_vec, &Device::Cpu)?,
+            Tensor::new(rand_dones_vec, &Device::Cpu)?,
         ))
     }
 }
