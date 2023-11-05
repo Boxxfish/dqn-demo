@@ -12,7 +12,7 @@
     type Position,
     type GameState,
   } from "./constants";
-  import ManualPolicy from "./ManualPolicy.svelte";
+  import Policies from "./Policies.svelte";
   export let bindings;
   let { DQN } = bindings;
 
@@ -36,22 +36,25 @@
   let score = 0;
   let rowLen = 4;
   const onKeyDown = (e: KeyboardEvent) => {
-    switch (e.code) {
-      case "ArrowUp":
-        step(2);
-        break;
-      case "ArrowDown":
-        step(3);
-        break;
-      case "ArrowLeft":
-        step(0);
-        break;
-      case "ArrowRight":
-        step(1);
-        break;
-      case "KeyR":
-        reset();
-        break;
+    if (activeTab === 0) {
+      switch (e.code) {
+        case "ArrowUp":
+          step(2);
+          break;
+        case "ArrowDown":
+          step(3);
+          break;
+        case "ArrowLeft":
+          step(0);
+          break;
+        case "ArrowRight":
+          step(1);
+          break;
+      }
+    }
+
+    if (e.code === "KeyR") {
+      reset();
     }
   };
   const isBorder = (x: number, y: number) =>
@@ -142,10 +145,15 @@
   let running = true;
   const endEpisode = () => {
     running = false;
+    if (interval) {
+      clearInterval(interval);
+      runningDQN = false;
+      running = false;
+    }
   };
 
-  const toTransition = (e: ComponentEvents<ManualPolicy>["toTransition"]) => {
-    const {index} = e.detail;
+  const toTransition = (e: ComponentEvents<Policies>["toTransition"]) => {
+    const { index } = e.detail;
     if (index > 0) {
       cells = [...transitions[index][0][0].map((r) => [...r])];
       agentPos = transitions[index][0][1];
@@ -172,31 +180,58 @@
           case EMPTY:
             break;
           case COIN:
-            state[0 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
+            state[
+              0 * gridSizeBorder * gridSizeBorder +
+                (y + 1) * gridSizeBorder +
+                (x + 1)
+            ] = 1;
             break;
           case PIT:
-            state[1 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
+            state[
+              1 * gridSizeBorder * gridSizeBorder +
+                (y + 1) * gridSizeBorder +
+                (x + 1)
+            ] = 1;
             break;
           case WALL:
-            state[2 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
+            state[
+              2 * gridSizeBorder * gridSizeBorder +
+                (y + 1) * gridSizeBorder +
+                (x + 1)
+            ] = 1;
             break;
           case BOX:
-            state[3 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
+            state[
+              3 * gridSizeBorder * gridSizeBorder +
+                (y + 1) * gridSizeBorder +
+                (x + 1)
+            ] = 1;
             break;
           case GOAL:
-            state[4 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
+            state[
+              4 * gridSizeBorder * gridSizeBorder +
+                (y + 1) * gridSizeBorder +
+                (x + 1)
+            ] = 1;
             break;
         }
       }
     }
     state[
-      5 * gridSizeBorder * gridSizeBorder + (agentPos[1] + 1) * gridSizeBorder + (agentPos[0] + 1)
+      5 * gridSizeBorder * gridSizeBorder +
+        (agentPos[1] + 1) * gridSizeBorder +
+        (agentPos[0] + 1)
     ] = 1;
 
     // Outer border
     for (let y = 0; y < gridSizeBorder; y++) {
       for (let x = 0; x < gridSizeBorder; x++) {
-        if (x >= 1 && x < gridSizeBorder - 1 && y >= 1 && y < gridSizeBorder - 1) {
+        if (
+          x >= 1 &&
+          x < gridSizeBorder - 1 &&
+          y >= 1 &&
+          y < gridSizeBorder - 1
+        ) {
           continue;
         }
         state[2 * gridSizeBorder * gridSizeBorder + y * gridSizeBorder + x] = 1;
@@ -204,9 +239,17 @@
     }
     return state;
   };
-  $: state = getState(cells, agentPos);
-  $: qVals = dqn ? dqn.eval_state(state) : null;
 
+  const stepDQN = () => {
+    if (dqn) {
+      const state = getState(cells, agentPos);
+      const qVals: Float32Array = dqn.eval_state(state);
+      const action = qVals.indexOf(Math.max(...qVals));
+      step(action);
+    }
+  };
+
+  let interval;
   onMount(async () => {
     fetch("q_net_grid.safetensors")
       .then((response) => response.blob())
@@ -218,9 +261,26 @@
         console.log(error);
         return [];
       });
+    return () => {
+      clearInterval(interval);
+    };
   });
 
+  const runDQN = () => {
+    interval = setInterval(stepDQN, 1000);
+    runningDQN = true;
+    running = true;
+  };
+
+  const pauseDQN = () => {
+    clearInterval(interval);
+    runningDQN = false;
+  };
+
   let transitions: [GameState, number, number, boolean][] = [];
+
+  let activeTab = 0;
+  let runningDQN = false;
 </script>
 
 <main class="color-dark">
@@ -247,8 +307,15 @@
     {/each}
   </div>
   <p>Score: {score}</p>
-  <p>{qVals}</p>
-  <ManualPolicy on:toTransition={toTransition} transitions={transitions} />
+  <Policies
+    on:toTransition={toTransition}
+    on:tabChanged={(e) => (activeTab = e.detail.index)}
+    on:run={runDQN}
+    on:pause={pauseDQN}
+    {transitions}
+    {activeTab}
+    {runningDQN}
+  />
 </main>
 
 <svelte:window on:keydown={onKeyDown} />

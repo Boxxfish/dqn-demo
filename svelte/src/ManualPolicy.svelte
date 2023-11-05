@@ -3,11 +3,10 @@
   import { ACTION_ICONS, AGENT_ICON, ICONS, type GameState } from "./constants";
   const dispatch = createEventDispatcher();
 
-  export let transitions: [GameState, number, number, boolean][];
+  export let transitions: [GameState, number, number, boolean][] = [];
 </script>
 
 <div>
-  <h1>Manual</h1>
   <p>Use the arrow keys to move. Press <b>R</b> to restart.</p>
   <div class="transitions">
     {#each transitions as transition, i}
