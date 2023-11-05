@@ -168,19 +168,62 @@
   };
 
   let dqn = null;
-  $: qVals = dqn ? dqn.eval_state(Array(7 * 6 * 6)) : null;
+  const getState = (cells: number[][], agentPos: Position) => {
+    let state = Array(7 * 6 * 6);
+    const gridSize = 4;
+    for (let y = 0; y < gridSize; y++) {
+      for (let x = 0; x < gridSize; x++) {
+        const cell = cells[y][x];
+        switch (cell) {
+          case EMPTY:
+            break;
+          case WALL:
+            state[2 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            break;
+          case COIN:
+            state[0 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            break;
+          case BOX:
+            state[3 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            break;
+          case PIT:
+            state[1 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            break;
+          case GOAL:
+            state[4 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            break;
+        }
+      }
+    }
+
+    for (let y = 0; y < gridSize; y++) {
+      for (let x = 0; x < gridSize; x++) {
+        if (x >= 1 && x < gridSize - 1 && y >= 1 && y < gridSize - 1) {
+          continue;
+        }
+        state[2 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+      }
+    }
+    state[
+      5 * gridSize * gridSize + (agentPos[1] + 1) * gridSize + (agentPos[0] + 1)
+    ] = 1;
+    return state;
+  };
+  $: state = getState(cells, agentPos);
+  $: qVals = dqn ? dqn.eval_state(state) : null;
 
   onMount(async () => {
-  fetch("q_net_grid.safetensors")
-  .then(response => response.blob())
-  .then(data => data.arrayBuffer())
-  .then(data => {
-    dqn = DQN.load(new Uint8Array(data));
-  }).catch(error => {
-    console.log(error);
-    return [];
+    fetch("q_net_grid.safetensors")
+      .then((response) => response.blob())
+      .then((data) => data.arrayBuffer())
+      .then((data) => {
+        dqn = DQN.load(new Uint8Array(data));
+      })
+      .catch((error) => {
+        console.log(error);
+        return [];
+      });
   });
-});
 
   type GameState = [number[][], Position];
   let transitions: [GameState, number, number, boolean][] = [];
