@@ -1,5 +1,6 @@
 <script lang="ts">
-  // export let bindings;
+  export let bindings;
+  let {DQN} = bindings;
 
   const EMPTY = 0;
   const COIN = 1;
@@ -165,6 +166,9 @@
     }
   };
 
+  const dqn = DQN.load();
+  let qVals = dqn.eval_state(Array(7 * 6 * 6));
+
   type GameState = [number[][], Position];
   let transitions: [GameState, number, number, boolean][] = [];
 </script>
@@ -231,7 +235,7 @@
       {/each}
     </div>
   </div>
-  <!-- <p>{bindings.add(6, 7)}</p> -->
+  <p>{qVals}</p>
 </main>
 
 <svelte:window on:keydown={onKeyDown} />

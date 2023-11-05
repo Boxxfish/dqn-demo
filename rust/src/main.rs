@@ -2,6 +2,7 @@ mod cartpole;
 mod dqn;
 mod env;
 mod replay_buffer;
+mod model;
 
 use crate::{dqn::train_dqn, replay_buffer::ReplayBuffer};
 use anyhow::Result;
@@ -9,6 +10,7 @@ use candle_core::{DType, Device, Module, Shape, Tensor, D};
 use candle_nn as nn;
 use env::{GridEnv, GRID_SIZE, NUM_CHANNELS};
 use indicatif::ProgressIterator;
+use model::QNet;
 use nn::{AdamW, VarBuilder, VarMap};
 use rand::Rng;
 
@@ -25,64 +27,6 @@ const Q_LR: f64 = 0.0001; // Learning rate of the q net.
 const WARMUP_STEPS: usize = 500; // For the first n number of steps, we will only sample randomly.
 const BUFFER_SIZE: usize = 10000; // Number of elements that can be stored in the buffer.
 const TARGET_UPDATE: usize = 500; // Number of iterations before updating Q target.
-
-struct QNet {
-    net: nn::sequential::Sequential,
-    advantage: nn::sequential::Sequential,
-    value: nn::sequential::Sequential,
-    action_count: usize,
-}
-
-impl QNet {
-    fn new(vs: VarBuilder, in_channels: usize, action_count: usize) -> Result<Self> {
-        let net = nn::seq()
-            .add(nn::conv2d(
-                in_channels,
-                8,
-                3,
-                nn::Conv2dConfig::default(),
-                vs.pp("conv1"),
-            )?)
-            .add(nn::Activation::Relu)
-            .add(nn::conv2d(
-                8,
-                32,
-                3,
-                nn::Conv2dConfig::default(),
-                vs.pp("conv2"),
-            )?)
-            .add(nn::Activation::Relu);
-        let relu = nn::Activation::Relu;
-        let advantage = nn::seq()
-            .add(nn::linear(32, 64, vs.pp("a_ln1"))?)
-            .add(nn::Activation::Relu)
-            .add(nn::linear(64, action_count, vs.pp("a_ln2"))?);
-        let value = nn::seq()
-            .add(nn::linear(32, 64, vs.pp("v_ln1"))?)
-            .add(nn::Activation::Relu)
-            .add(nn::linear(64, 1, vs.pp("v_ln2"))?);
-        Ok(Self {
-            net,
-            advantage,
-            value,
-            action_count,
-        })
-    }
-}
-
-impl Module for QNet {
-    fn forward(&self, xs: &Tensor) -> candle_core::Result<Tensor> {
-        let xs = self
-            .net
-            .forward(xs)?
-            .max_pool2d(GRID_SIZE - 4)?
-            .squeeze(D::Minus1)?
-            .squeeze(D::Minus1)?;
-        let advantage = self.advantage.forward(&xs)?;
-        let value = self.value.forward(&xs)?;
-        &value.repeat(&[1, self.action_count])? + &advantage - &advantage.mean_keepdim(1)?.repeat(&[1, self.action_count])?
-    }
-}
 
 fn process_obs(state: Vec<Vec<Vec<bool>>>) -> Result<Tensor> {
     Ok(Tensor::from_vec(
