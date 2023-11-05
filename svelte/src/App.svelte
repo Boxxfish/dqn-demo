@@ -240,11 +240,11 @@
     return state;
   };
 
+  $: state = getState(cells, agentPos);
+  $: qVals = dqn ? dqn.eval_state(state) : [];
+  $: action = qVals.length > 0 ? qVals.indexOf(Math.max(...qVals)) : 0;
   const stepDQN = () => {
     if (dqn) {
-      const state = getState(cells, agentPos);
-      const qVals: Float32Array = dqn.eval_state(state);
-      const action = qVals.indexOf(Math.max(...qVals));
       step(action);
     }
   };
@@ -301,6 +301,18 @@
                 ? ICONS[cell - 1]
                 : ''}"
             />
+            {#if x === agentPos[0] - 1 && y == agentPos[1]}
+                <span class="q-value">{qVals[0]?.toFixed(2)}</span>
+            {/if}
+            {#if x === agentPos[0] + 1 && y == agentPos[1]}
+                <span class="q-value">{qVals[1]?.toFixed(2)}</span>
+            {/if}
+            {#if x === agentPos[0] && y == agentPos[1] - 1}
+                <span class="q-value">{qVals[2]?.toFixed(2)}</span>
+            {/if}
+            {#if x === agentPos[0] && y == agentPos[1] + 1}
+                <span class="q-value">{qVals[3]?.toFixed(2)}</span>
+            {/if}
           </div>
         </div>
       {/each}
@@ -345,27 +357,13 @@
     align-content: center;
   }
 
-  .transitions {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .state {
-    display: flex;
-    flex-wrap: wrap;
-    width: 8rem;
-  }
-
-  .cell-mini {
-    width: 2rem;
-    height: 2rem;
-  }
-
-  .cell-icon-mini {
-    font-size: 1rem;
+  .q-value {
+    position: absolute;
     text-align: center;
-    align-content: center;
+    font-size: 1rem;
+    font-weight: bold;
   }
+
   .action {
     padding: 1rem;
     font-size: 2rem;
