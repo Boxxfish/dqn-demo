@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   export let bindings;
-  let {DQN} = bindings;
+  let { DQN } = bindings;
 
   const EMPTY = 0;
   const COIN = 1;
@@ -166,8 +167,20 @@
     }
   };
 
-  const dqn = DQN.load();
-  let qVals = dqn.eval_state(Array(7 * 6 * 6));
+  let dqn = null;
+  $: qVals = dqn ? dqn.eval_state(Array(7 * 6 * 6)) : null;
+
+  onMount(async () => {
+  fetch("q_net_grid.safetensors")
+  .then(response => response.blob())
+  .then(data => data.arrayBuffer())
+  .then(data => {
+    dqn = DQN.load(new Uint8Array(data));
+  }).catch(error => {
+    console.log(error);
+    return [];
+  });
+});
 
   type GameState = [number[][], Position];
   let transitions: [GameState, number, number, boolean][] = [];
@@ -197,6 +210,7 @@
     {/each}
   </div>
   <p>Score: {score}</p>
+  <p>{qVals}</p>
   <div>
     <h1>Manual</h1>
     <p>Use the arrow keys to move. Press <b>R</b> to restart.</p>
@@ -235,7 +249,6 @@
       {/each}
     </div>
   </div>
-  <p>{qVals}</p>
 </main>
 
 <svelte:window on:keydown={onKeyDown} />
