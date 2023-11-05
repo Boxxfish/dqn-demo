@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2.63"
-candle-core = { git = "https://github.com/huggingface/candle.git" }
+candle-core = { git = "https://github.com/huggingface/candle.git", features = ["cuda"] }
 candle-nn = { git = "https://github.com/huggingface/candle.git" }
 safetensors = "0.4.0"
 rand = "0.8.0"

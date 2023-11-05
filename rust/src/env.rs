@@ -1,12 +1,14 @@
 use rand::Rng;
 
-const GRID_SIZE: usize = 4;
+pub const GRID_SIZE: usize = 6;
 const COIN_IDX: usize = 0;
 const PIT_IDX: usize = 1;
 const WALL_IDX: usize = 2;
 const BOX_IDX: usize = 3;
+pub const NUM_CHANNELS: usize = BOX_IDX + 1 + 3;
+pub const MAX_TIME: u32 = 32;
 
-type State = Vec<Vec<Vec<bool>>>;
+pub type State = Vec<Vec<Vec<bool>>>;
 type Position = (usize, usize);
 
 /// Gym-like interface for the environment.
@@ -15,6 +17,17 @@ pub struct GridEnv {
     pub grid: Vec<Vec<Vec<bool>>>,
     pub goal_pos: Position,
     pub agent_pos: Position,
+    pub timer: u32,
+}
+
+/// Returns the position of an empty cell.
+fn get_empty(ref_grid: &[usize], taken: &[Position]) -> Position {
+    let mut rng = rand::thread_rng();
+    let mut new_pos = (rng.gen_range(0..GRID_SIZE), rng.gen_range(0..GRID_SIZE));
+    while ref_grid[new_pos.1 * GRID_SIZE + new_pos.0] != 0 || taken.contains(&new_pos) {
+        new_pos = (rng.gen_range(0..GRID_SIZE), rng.gen_range(0..GRID_SIZE));
+    }
+    new_pos
 }
 
 impl GridEnv {
@@ -23,15 +36,29 @@ impl GridEnv {
             grid: Vec::new(),
             goal_pos: (0, 0),
             agent_pos: (0, 0),
+            timer: 0,
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self) -> State {
         let mut rng = rand::thread_rng();
-        let ref_grid: Vec<_> = (0..(GRID_SIZE * GRID_SIZE))
-            .map(|_| rng.gen_range(0..4))
-            .collect();
-        let mut grid = vec![vec![vec![false; GRID_SIZE]; GRID_SIZE]; 3];
+        let ref_grid = loop {
+            let mut ref_grid: Vec<_> = (0..(GRID_SIZE * GRID_SIZE))
+                .map(|_| rng.gen_range(0..(BOX_IDX + 1)))
+                .collect();
+            for y in 0..GRID_SIZE {
+                for x in 0..GRID_SIZE {
+                    if (1..GRID_SIZE - 1).contains(&x) && (1..GRID_SIZE - 1).contains(&y) {
+                        continue;
+                    }
+                    ref_grid[y * GRID_SIZE + x] = WALL_IDX + 1;
+                }
+            }
+            if ref_grid.iter().filter(|&&c| c == 0).count() > 2 {
+                break ref_grid;
+            }
+        };
+        let mut grid = vec![vec![vec![false; GRID_SIZE]; GRID_SIZE]; BOX_IDX + 2];
         for (i, &val) in ref_grid.iter().enumerate() {
             let y = i / GRID_SIZE;
             let x = i % GRID_SIZE;
@@ -39,14 +66,18 @@ impl GridEnv {
                 grid[val - 1][y][x] = true;
             }
         }
+        let goal_pos = get_empty(&ref_grid, &[]);
+        let agent_pos = get_empty(&ref_grid, &[goal_pos]);
         *self = Self {
             grid,
-            goal_pos: (rng.gen_range(0..GRID_SIZE), rng.gen_range(0..GRID_SIZE)),
-            agent_pos: (rng.gen_range(0..GRID_SIZE), rng.gen_range(0..GRID_SIZE)),
+            goal_pos,
+            agent_pos,
+            timer: 0,
         };
+        self.get_obs()
     }
 
-    pub fn step(&mut self, action: u32) -> (State, u32, f32, bool) {
+    pub fn step(&mut self, action: u32) -> (State, f32, bool, bool) {
         let mut dx = 0;
         let mut dy = 0;
         match action {
@@ -98,7 +129,10 @@ impl GridEnv {
 
         self.agent_pos = (x, y);
 
-        (self.get_obs(), action, reward, done)
+        self.timer += 1;
+        let trunc = self.timer >= MAX_TIME;
+
+        (self.get_obs(), reward, done, trunc)
     }
 
     fn get_obs(&self) -> State {

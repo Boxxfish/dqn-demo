@@ -1,12 +1,13 @@
 mod cartpole;
 mod dqn;
+mod env;
 mod replay_buffer;
 
 use crate::{dqn::train_dqn, replay_buffer::ReplayBuffer};
 use anyhow::Result;
-use candle_core::{DType, Device, Module, Shape, Tensor};
+use candle_core::{DType, Device, Module, Shape, Tensor, D};
 use candle_nn as nn;
-use cartpole::CartpoleEnv;
+use env::{GridEnv, GRID_SIZE, NUM_CHANNELS};
 use indicatif::ProgressIterator;
 use nn::{AdamW, VarBuilder, VarMap};
 use rand::Rng;
@@ -17,75 +18,108 @@ const ITERATIONS: usize = 100000;
 const TRAIN_ITERS: usize = 1; // Number of passes over the samples collected.
 const TRAIN_BATCH_SIZE: usize = 512; // Minibatch size while training models.
 const DISCOUNT: f64 = 0.999; // Discount factor applied to rewards.
-const Q_EPSILON: f32 = 0.1; // Epsilon for epsilon greedy strategy. This gets annealed over time.
+const Q_EPSILON: f32 = 0.5; // Epsilon for epsilon greedy strategy. This gets annealed over time.
 const EVAL_STEPS: usize = 8; // Number of eval runs to average over.
 const MAX_EVAL_STEPS: usize = 300; // Max number of steps to take during each eval run.
 const Q_LR: f64 = 0.0001; // Learning rate of the q net.
 const WARMUP_STEPS: usize = 500; // For the first n number of steps, we will only sample randomly.
 const BUFFER_SIZE: usize = 10000; // Number of elements that can be stored in the buffer.
 const TARGET_UPDATE: usize = 500; // Number of iterations before updating Q target.
-const DEVICE: Device = Device::Cpu;
 
 struct QNet {
     net: nn::sequential::Sequential,
     advantage: nn::sequential::Sequential,
     value: nn::sequential::Sequential,
+    action_count: usize,
 }
 
 impl QNet {
-    fn new(vs: VarBuilder, flat_obs_dim: usize, action_count: usize) -> Result<Self> {
+    fn new(vs: VarBuilder, in_channels: usize, action_count: usize) -> Result<Self> {
         let net = nn::seq()
-            .add(nn::linear(flat_obs_dim, 64, vs.pp("ln1"))?)
+            .add(nn::conv2d(
+                in_channels,
+                8,
+                3,
+                nn::Conv2dConfig::default(),
+                vs.pp("conv1"),
+            )?)
             .add(nn::Activation::Relu)
-            .add(nn::linear(64, 64, vs.pp("ln2"))?)
+            .add(nn::conv2d(
+                8,
+                32,
+                3,
+                nn::Conv2dConfig::default(),
+                vs.pp("conv2"),
+            )?)
             .add(nn::Activation::Relu);
         let relu = nn::Activation::Relu;
         let advantage = nn::seq()
-            .add(nn::linear(64, 64, vs.pp("a_ln1"))?)
+            .add(nn::linear(32, 64, vs.pp("a_ln1"))?)
             .add(nn::Activation::Relu)
             .add(nn::linear(64, action_count, vs.pp("a_ln2"))?);
         let value = nn::seq()
-            .add(nn::linear(64, 64, vs.pp("v_ln1"))?)
+            .add(nn::linear(32, 64, vs.pp("v_ln1"))?)
             .add(nn::Activation::Relu)
             .add(nn::linear(64, 1, vs.pp("v_ln2"))?);
         Ok(Self {
             net,
             advantage,
             value,
+            action_count,
         })
     }
 }
 
 impl Module for QNet {
     fn forward(&self, xs: &Tensor) -> candle_core::Result<Tensor> {
-        let xs = self.net.forward(xs)?;
+        let xs = self
+            .net
+            .forward(xs)?
+            .max_pool2d(GRID_SIZE - 4)?
+            .squeeze(D::Minus1)?
+            .squeeze(D::Minus1)?;
         let advantage = self.advantage.forward(&xs)?;
         let value = self.value.forward(&xs)?;
-        &value.repeat(&[1, 2])? + &advantage - &advantage.mean_keepdim(1)?.repeat(&[1, 2])?
+        &value.repeat(&[1, self.action_count])? + &advantage - &advantage.mean_keepdim(1)?.repeat(&[1, self.action_count])?
     }
 }
 
-fn process_obs(state: crate::cartpole::State) -> Result<Tensor> {
-    Ok(Tensor::new(&[state.0, state.1, state.2, state.3], &Device::Cpu)?.unsqueeze(0)?)
+fn process_obs(state: Vec<Vec<Vec<bool>>>) -> Result<Tensor> {
+    Ok(Tensor::from_vec(
+        state
+            .iter()
+            .flatten()
+            .flatten()
+            .map(|&b| if b { 1. } else { 0. })
+            .collect::<Vec<f32>>(),
+        &[NUM_CHANNELS, GRID_SIZE, GRID_SIZE],
+        &Device::Cpu,
+    )?
+    .unsqueeze(0)?)
 }
 
 fn main() -> Result<()> {
-    let mut train_env = CartpoleEnv::new();
-    let mut test_env = CartpoleEnv::new();
+    let device = Device::Cpu;
+
+    let mut train_env = GridEnv::new();
+    let mut test_env = GridEnv::new();
 
     // Initialize Q network
-    let obs_space = train_env.observation_space();
-    let act_space = train_env.action_space();
+    let obs_channels = NUM_CHANNELS;
+    let act_space = 4;
     let mut vm = VarMap::new();
     let vs = VarBuilder::from_varmap(&vm, DType::F32, &Device::Cpu);
-    let q_net = QNet::new(vs, obs_space, act_space)?;
+    let q_net = QNet::new(vs, obs_channels, act_space)?;
     let target_vm = VarMap::new();
-    let target_vs = VarBuilder::from_varmap(&vm, DType::F32, &DEVICE);
-    let q_net_target = QNet::new(target_vs, obs_space, act_space)?;
+    let target_vs = VarBuilder::from_varmap(&vm, DType::F32, &device);
+    let q_net_target = QNet::new(target_vs, obs_channels, act_space)?;
     let mut q_opt = AdamW::new_lr(vm.all_vars(), Q_LR)?;
 
     // A replay buffer stores experience collected over all sampling runs
-    let mut buffer = ReplayBuffer::new(Shape::from_dims(&[obs_space]), BUFFER_SIZE);
+    let mut buffer = ReplayBuffer::new(
+        Shape::from_dims(&[obs_channels, GRID_SIZE, GRID_SIZE]),
+        BUFFER_SIZE,
+    );
 
     let mut obs = process_obs(train_env.reset())?;
     let mut rng = rand::thread_rng();
@@ -103,7 +137,7 @@ fn main() -> Result<()> {
                 let q_vals = q_net.forward(&obs)?;
                 q_vals.argmax(1)?.squeeze(0)?.to_scalar::<u32>()?
             };
-            let (obs_, reward, done) = train_env.step(action);
+            let (obs_, reward, done, trunc) = train_env.step(action);
             let next_obs = process_obs(obs_)?;
             buffer.insert_step(
                 obs,
@@ -113,7 +147,7 @@ fn main() -> Result<()> {
                 &[done],
             );
             obs = next_obs;
-            if done {
+            if done || trunc {
                 obs = process_obs(train_env.reset())?;
             }
         }
@@ -127,7 +161,7 @@ fn main() -> Result<()> {
                 &mut q_opt,
                 &mut vm,
                 &mut buffer,
-                &DEVICE,
+                &device,
                 TRAIN_ITERS,
                 TRAIN_BATCH_SIZE,
                 DISCOUNT,
@@ -146,10 +180,10 @@ fn main() -> Result<()> {
                         // pred_reward_total += (
                         //     q_net(eval_obs.unsqueeze(0)).squeeze().max(0).values.item()
                         // );
-                        let (obs_, reward, eval_done) = test_env.step(action);
+                        let (obs_, reward, eval_done, eval_trunc) = test_env.step(action);
                         eval_obs = process_obs(obs_)?;
                         reward_total += reward;
-                        if eval_done {
+                        if eval_done || eval_trunc {
                             let obs_ = test_env.reset();
                             eval_obs = process_obs(obs_)?;
                             break;
@@ -171,7 +205,7 @@ fn main() -> Result<()> {
             }
 
             // Save network
-            vm.save("temp/q_net_cartpole.safetensors")?;
+            vm.save("temp/q_net_grid.safetensors")?;
         }
     }
     Ok(())
