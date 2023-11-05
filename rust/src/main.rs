@@ -1,8 +1,8 @@
 mod cartpole;
 mod dqn;
 mod env;
-mod replay_buffer;
 mod model;
+mod replay_buffer;
 
 use crate::{dqn::train_dqn, replay_buffer::ReplayBuffer};
 use anyhow::Result;
@@ -16,7 +16,7 @@ use rand::Rng;
 
 // Hyperparameters
 const TRAIN_STEPS: usize = 4;
-const ITERATIONS: usize = 100000;
+const ITERATIONS: usize = 10000;
 const TRAIN_ITERS: usize = 1; // Number of passes over the samples collected.
 const TRAIN_BATCH_SIZE: usize = 512; // Minibatch size while training models.
 const DISCOUNT: f64 = 0.9; // Discount factor applied to rewards.

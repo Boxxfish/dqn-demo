@@ -144,7 +144,7 @@ impl GridEnv {
         let mut goal_layer = vec![vec![false; GRID_SIZE]; GRID_SIZE];
         goal_layer[self.goal_pos.1][self.goal_pos.0] = true;
         let mut agent_layer = vec![vec![false; GRID_SIZE]; GRID_SIZE];
-        agent_layer[self.goal_pos.1][self.goal_pos.0] = true;
+        agent_layer[self.agent_pos.1][self.agent_pos.0] = true;
         state.push(goal_layer);
         state.push(agent_layer);
         state

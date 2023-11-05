@@ -1,33 +1,26 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, type ComponentEvents } from "svelte";
+  import {
+    AGENT_ICON,
+    BOX,
+    COIN,
+    EMPTY,
+    GOAL,
+    PIT,
+    WALL,
+    ICONS,
+    type Position,
+    type GameState,
+  } from "./constants";
+  import ManualPolicy from "./ManualPolicy.svelte";
   export let bindings;
   let { DQN } = bindings;
-
-  const EMPTY = 0;
-  const COIN = 1;
-  const PIT = 2;
-  const GOAL = 3;
-  const WALL = 4;
-  const BOX = 5;
 
   const ORIG_CELLS = [
     [0, 0, 4, 3],
     [1, 5, 0, 0],
     [1, 2, 4, 0],
     [0, 0, 4, 1],
-  ];
-  const AGENT_ICON = "bi-person-fill";
-  const COIN_ICON = "bi-gem";
-  const PIT_ICON = "bi-exclamation-octagon-fill color-danger";
-  const GOAL_ICON = "bi-flag";
-  const WALL_ICON = "bi-square-fill";
-  const BOX_ICON = "bi-box2-fill";
-  const ICONS = [COIN_ICON, PIT_ICON, GOAL_ICON, WALL_ICON, BOX_ICON];
-  const ACTION_ICONS = [
-    "bi-arrow-left",
-    "bi-arrow-right",
-    "bi-arrow-up",
-    "bi-arrow-down",
   ];
 
   const reset = () => {
@@ -39,7 +32,6 @@
   };
 
   let cells = [...ORIG_CELLS.map((r) => [...r])];
-  type Position = [number, number];
   let agentPos: Position = [0, 3];
   let score = 0;
   let rowLen = 4;
@@ -152,16 +144,17 @@
     running = false;
   };
 
-  const toTransition = (i: number) => {
-    if (i > 0) {
-      cells = [...transitions[i][0][0].map((r) => [...r])];
-      agentPos = transitions[i][0][1];
+  const toTransition = (e: ComponentEvents<ManualPolicy>["toTransition"]) => {
+    const {index} = e.detail;
+    if (index > 0) {
+      cells = [...transitions[index][0][0].map((r) => [...r])];
+      agentPos = transitions[index][0][1];
       score = transitions
-        .slice(0, i)
+        .slice(0, index)
         .map((t) => t[2])
         .reduce((prev, curr) => prev + curr);
       running = true;
-      transitions = transitions.slice(0, i);
+      transitions = transitions.slice(0, index);
     } else {
       reset();
     }
@@ -171,6 +164,7 @@
   const getState = (cells: number[][], agentPos: Position) => {
     let state = Array(7 * 6 * 6);
     const gridSize = 4;
+    const gridSizeBorder = 6;
     for (let y = 0; y < gridSize; y++) {
       for (let x = 0; x < gridSize; x++) {
         const cell = cells[y][x];
@@ -178,34 +172,34 @@
           case EMPTY:
             break;
           case COIN:
-            state[0 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            state[0 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
             break;
           case PIT:
-            state[1 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            state[1 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
             break;
           case WALL:
-            state[2 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            state[2 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
             break;
           case BOX:
-            state[3 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            state[3 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
             break;
           case GOAL:
-            state[4 * gridSize * gridSize + (y + 1) * gridSize + (x + 1)] = 1;
+            state[4 * gridSizeBorder * gridSizeBorder + (y + 1) * gridSizeBorder + (x + 1)] = 1;
             break;
         }
       }
     }
     state[
-      5 * gridSize * gridSize + (agentPos[1] + 1) * gridSize + (agentPos[0] + 1)
+      5 * gridSizeBorder * gridSizeBorder + (agentPos[1] + 1) * gridSizeBorder + (agentPos[0] + 1)
     ] = 1;
 
     // Outer border
-    for (let y = 0; y < 6; y++) {
-      for (let x = 0; x < 6; x++) {
-        if (x >= 1 && x < gridSize - 1 && y >= 1 && y < gridSize - 1) {
+    for (let y = 0; y < gridSizeBorder; y++) {
+      for (let x = 0; x < gridSizeBorder; x++) {
+        if (x >= 1 && x < gridSizeBorder - 1 && y >= 1 && y < gridSizeBorder - 1) {
           continue;
         }
-        state[2 * gridSize * gridSize + y * gridSize + x] = 1;
+        state[2 * gridSizeBorder * gridSizeBorder + y * gridSizeBorder + x] = 1;
       }
     }
     return state;
@@ -226,7 +220,6 @@
       });
   });
 
-  type GameState = [number[][], Position];
   let transitions: [GameState, number, number, boolean][] = [];
 </script>
 
@@ -255,44 +248,7 @@
   </div>
   <p>Score: {score}</p>
   <p>{qVals}</p>
-  <div>
-    <h1>Manual</h1>
-    <p>Use the arrow keys to move. Press <b>R</b> to restart.</p>
-    <div class="transitions">
-      {#each transitions as transition, i}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div class="transition" on:click={() => toTransition(i)}>
-          <div class="state">
-            {#each transition[0][0] as row, y}
-              {#each row as cell, x}
-                <div class="cell-mini bg-primary">
-                  <div class="cell-icon-mini">
-                    <i
-                      class="bi {x === transition[0][1][0] &&
-                      y === transition[0][1][1]
-                        ? AGENT_ICON
-                        : cell > 0
-                        ? ICONS[cell - 1]
-                        : ''}"
-                    />
-                  </div>
-                </div>
-              {/each}
-            {/each}
-          </div>
-          <div class="action">
-            <i class="bi {ACTION_ICONS[transition[1]]}" />
-          </div>
-          <div class="transition-text">
-            {transition[2] > 0 ? "+" : ""}{transition[2]}
-          </div>
-          {#if transition[3]}
-            <div class="transition-text">Done</div>
-          {/if}
-        </div>
-      {/each}
-    </div>
-  </div>
+  <ManualPolicy on:toTransition={toTransition} transitions={transitions} />
 </main>
 
 <svelte:window on:keydown={onKeyDown} />

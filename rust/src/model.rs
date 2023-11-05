@@ -20,7 +20,10 @@ impl QNet {
                 in_channels,
                 8,
                 3,
-                nn::Conv2dConfig::default(),
+                nn::Conv2dConfig {
+                    padding: 1,
+                    ..Default::default()
+                },
                 vs.pp("conv1"),
             )?)
             .add(nn::Activation::Relu)
@@ -28,11 +31,13 @@ impl QNet {
                 8,
                 32,
                 3,
-                nn::Conv2dConfig::default(),
+                nn::Conv2dConfig {
+                    padding: 1,
+                    ..Default::default()
+                },
                 vs.pp("conv2"),
             )?)
             .add(nn::Activation::Relu);
-        let relu = nn::Activation::Relu;
         let advantage = nn::seq()
             .add(nn::linear(32, 64, vs.pp("a_ln1"))?)
             .add(nn::Activation::Relu)
@@ -55,7 +60,7 @@ impl Module for QNet {
         let xs = self
             .net
             .forward(xs)?
-            .max_pool2d(GRID_SIZE - 4)?
+            .max_pool2d(GRID_SIZE)?
             .squeeze(D::Minus1)?
             .squeeze(D::Minus1)?;
         let advantage = self.advantage.forward(&xs)?;
