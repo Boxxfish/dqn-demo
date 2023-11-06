@@ -34,21 +34,21 @@ pub fn train_dqn<M: Module, O: Optimizer>(
 
         // Train q network
         // q_opt.zero_grad();
-        let next_actions = q_net.forward(&states)?.argmax(1)?.squeeze(0)?.detach()?;
-        let q_target = (rewards
+        let next_actions = q_net.forward(&states)?.argmax(1)?.detach()?.squeeze(0)?;
+        let q_target = (&rewards
             + discount
                 * (q_net_target
                     .forward(&states)?
                     .detach()?
                     .gather(&next_actions.unsqueeze(1)?, 1)?
+                    .squeeze(1)?
                     .to_dtype(DType::F32)?
-                    * (1. - &dones.unsqueeze(1)?))?
-                    .squeeze(1)?)?;
+                    * (1. - &dones)?)?)?;
         let q_pred = q_net
             .forward(&prev_states)?
             .gather(&actions.unsqueeze(1)?, 1)?
             .squeeze(1)?;
-        let diff = (&q_pred - q_target)?;
+        let diff = (q_target - &q_pred)?;
         let q_loss = (&diff * &diff)?.mean(0)?;
         q_opt.backward_step(&q_loss)?;
         total_q_loss += q_loss.to_scalar::<f32>()?;

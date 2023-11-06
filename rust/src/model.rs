@@ -19,13 +19,13 @@ impl QNet {
             ..Default::default()
         };
         let net = nn::seq()
-            .add(nn::conv2d(in_channels, 8, 3, conv_conf, vs.pp("conv1"))?)
+            .add(nn::conv2d(in_channels, 16, 3, conv_conf, vs.pp("conv1"))?)
             .add(nn::Activation::Relu)
-            .add(nn::conv2d(8, 8, 3, conv_conf, vs.pp("conv2"))?)
+            .add(nn::conv2d(16, 16, 3, conv_conf, vs.pp("conv2"))?)
             .add(nn::Activation::Relu)
-            .add(nn::conv2d(8, 8, 3, conv_conf, vs.pp("conv3"))?)
+            .add(nn::conv2d(16, 16, 3, conv_conf, vs.pp("conv3"))?)
             .add(nn::Activation::Relu)
-            .add(nn::conv2d(8, 16, 3, conv_conf, vs.pp("conv4"))?)
+            .add(nn::conv2d(16, 16, 3, conv_conf, vs.pp("conv4"))?)
             .add(nn::Activation::Relu);
         let advantage = nn::seq()
             .add(nn::linear(16, 32, vs.pp("a_ln1"))?)

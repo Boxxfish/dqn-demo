@@ -51,7 +51,7 @@ impl GridEnv {
             let ref_grid = vec![
                 3, 3, 3, 3, 3, 3,
                 3, 0, 0, 3, 0, 3,
-                3, 1, 4, 0, 0, 3,
+                3, 1, 0, 0, 0, 3,
                 3, 1, 2, 3, 0, 3,
                 3, 0, 0, 3, 1, 3,
                 3, 3, 3, 3, 3, 3,
@@ -84,8 +84,8 @@ impl GridEnv {
                 grid[val - 1][y][x] = true;
             }
         }
-        let goal_pos = (1, 4);//get_empty(&ref_grid, &[]);
-        let agent_pos = get_empty(&ref_grid, &[goal_pos]);
+        let goal_pos = (4, 1);//get_empty(&ref_grid, &[]);
+        let agent_pos = (1, 4);//get_empty(&ref_grid, &[goal_pos]);
         *self = Self {
             grid,
             goal_pos,
@@ -107,9 +107,9 @@ impl GridEnv {
             _ => panic!(),
         }
 
-        let mut x = (self.agent_pos.0 as i32 + dx).clamp(0, GRID_SIZE as i32) as usize;
-        let mut y = (self.agent_pos.1 as i32 + dy).clamp(0, GRID_SIZE as i32) as usize;
-        let mut reward = -0.01;
+        let mut x = (self.agent_pos.0 as i32 + dx).clamp(0, GRID_SIZE as i32 - 1) as usize;
+        let mut y = (self.agent_pos.1 as i32 + dy).clamp(0, GRID_SIZE as i32 - 1) as usize;
+        let mut reward = -0.001;
         let mut done = false;
 
         // Moving into a wall.
@@ -138,6 +138,7 @@ impl GridEnv {
         // Moving into the goal.
         else if (x, y) == self.goal_pos {
             reward += 1.;
+            println!("Found goal!");
             done = true;
         }
         // Moving into a pit.

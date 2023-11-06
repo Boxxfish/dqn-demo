@@ -16,11 +16,11 @@ use rand::Rng;
 
 // Hyperparameters
 const TRAIN_STEPS: usize = 20;
-const ITERATIONS: usize = 10000;
+const ITERATIONS: usize = 20000;
 const TRAIN_ITERS: usize = 1; // Number of passes over the samples collected.
-const TRAIN_BATCH_SIZE: usize = 512; // Minibatch size while training models.
-const DISCOUNT: f64 = 0.9; // Discount factor applied to rewards.
-const Q_EPSILON: f32 = 0.3; // Epsilon for epsilon greedy strategy. This gets annealed over time.
+const TRAIN_BATCH_SIZE: usize = 64; // Minibatch size while training models.
+const DISCOUNT: f64 = 0.99; // Discount factor applied to rewards.
+const Q_EPSILON: f32 = 0.8; // Epsilon for epsilon greedy strategy. This gets annealed over time.
 const EVAL_STEPS: usize = 8; // Number of eval runs to average over.
 const MAX_EVAL_STEPS: usize = 300; // Max number of steps to take during each eval run.
 const Q_LR: f64 = 0.0001; // Learning rate of the q net.
