@@ -1,5 +1,5 @@
 use anyhow::Result;
-use candle_core::{backprop::GradStore, DType, Device, IndexOp, Module};
+use candle_core::{backprop::GradStore, DType, Device, IndexOp, Module, Tensor};
 use candle_nn::{Optimizer, VarBuilder, VarMap};
 
 use crate::replay_buffer::ReplayBuffer;
@@ -16,6 +16,7 @@ pub fn train_dqn<M: Module, O: Optimizer>(
     train_iters: usize,
     train_batch_size: usize,
     discount: f64,
+    priority: f64,
 ) -> Result<f32> {
     let mut total_q_loss = 0.;
     for v in vm.all_vars() {
@@ -23,7 +24,8 @@ pub fn train_dqn<M: Module, O: Optimizer>(
     }
 
     for _ in 0..train_iters {
-        let (prev_states, states, actions, rewards, dones) = buffer.sample(train_batch_size)?;
+        let (indices, probs, prev_states, states, actions, rewards, dones) =
+            buffer.sample(train_batch_size)?;
 
         // Move batch to device if applicable
         let prev_states = prev_states.to_device(device)?;
@@ -49,9 +51,10 @@ pub fn train_dqn<M: Module, O: Optimizer>(
             .gather(&actions.unsqueeze(1)?, 1)?
             .squeeze(1)?;
         let diff = (q_target - &q_pred)?;
-        let q_loss = (&diff * &diff)?.mean(0)?;
+        let q_loss = ((1. / probs)?.powf(priority) * (&diff * &diff)?)?.mean(0)?;
         q_opt.backward_step(&q_loss)?;
         total_q_loss += q_loss.to_scalar::<f32>()?;
+        buffer.update_errors(&indices, &diff.to_vec1()?)
     }
 
     if device.is_cpu() {

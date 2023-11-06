@@ -16,7 +16,7 @@ use rand::Rng;
 
 // Hyperparameters
 const TRAIN_STEPS: usize = 20;
-const ITERATIONS: usize = 20000;
+const ITERATIONS: usize = 10000;
 const TRAIN_ITERS: usize = 1; // Number of passes over the samples collected.
 const TRAIN_BATCH_SIZE: usize = 64; // Minibatch size while training models.
 const DISCOUNT: f64 = 0.99; // Discount factor applied to rewards.
@@ -27,6 +27,7 @@ const Q_LR: f64 = 0.0001; // Learning rate of the q net.
 const WARMUP_STEPS: usize = 500; // For the first n number of steps, we will only sample randomly.
 const BUFFER_SIZE: usize = 10000; // Number of elements that can be stored in the buffer.
 const TARGET_UPDATE: usize = 500; // Number of iterations before updating Q target.
+const START_PRIORITY: f32 = 0.4; // Priority to start with, for priority sampling.
 
 fn process_obs(state: Vec<Vec<Vec<bool>>>) -> Result<Tensor> {
     Ok(Tensor::from_vec(
@@ -99,6 +100,7 @@ fn main() -> Result<()> {
         }
 
         // Train
+        let priority = (START_PRIORITY + percent_done * (1. - START_PRIORITY)) as f64;
         if buffer.filled {
             let total_q_loss = train_dqn(
                 &q_net,
@@ -110,6 +112,7 @@ fn main() -> Result<()> {
                 TRAIN_ITERS,
                 TRAIN_BATCH_SIZE,
                 DISCOUNT,
+                priority,
             )?;
 
             // Evaluate the network's performance after this training iteration.
