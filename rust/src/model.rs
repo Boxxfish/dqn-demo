@@ -14,37 +14,27 @@ pub struct QNet {
 
 impl QNet {
     pub fn new(vs: VarBuilder, in_channels: usize, action_count: usize) -> Result<Self> {
+        let conv_conf = nn::Conv2dConfig {
+            padding: 1,
+            ..Default::default()
+        };
         let net = nn::seq()
-            .add(nn::conv2d(
-                in_channels,
-                16,
-                3,
-                nn::Conv2dConfig {
-                    padding: 1,
-                    ..Default::default()
-                },
-                vs.pp("conv1"),
-            )?)
+            .add(nn::conv2d(in_channels, 8, 3, conv_conf, vs.pp("conv1"))?)
             .add(nn::Activation::Relu)
-            .add(nn::conv2d(
-                16,
-                32,
-                3,
-                nn::Conv2dConfig {
-                    padding: 1,
-                    ..Default::default()
-                },
-                vs.pp("conv2"),
-            )?)
+            .add(nn::conv2d(8, 8, 3, conv_conf, vs.pp("conv2"))?)
+            .add(nn::Activation::Relu)
+            .add(nn::conv2d(8, 8, 3, conv_conf, vs.pp("conv3"))?)
+            .add(nn::Activation::Relu)
+            .add(nn::conv2d(8, 16, 3, conv_conf, vs.pp("conv4"))?)
             .add(nn::Activation::Relu);
         let advantage = nn::seq()
-            .add(nn::linear(32, 64, vs.pp("a_ln1"))?)
+            .add(nn::linear(16, 32, vs.pp("a_ln1"))?)
             .add(nn::Activation::Relu)
-            .add(nn::linear(64, action_count, vs.pp("a_ln2"))?);
+            .add(nn::linear(32, action_count, vs.pp("a_ln2"))?);
         let value = nn::seq()
-            .add(nn::linear(32, 64, vs.pp("v_ln1"))?)
+            .add(nn::linear(16, 32, vs.pp("v_ln1"))?)
             .add(nn::Activation::Relu)
-            .add(nn::linear(64, 1, vs.pp("v_ln2"))?);
+            .add(nn::linear(32, 1, vs.pp("v_ln2"))?);
         Ok(Self {
             net,
             advantage,
@@ -59,7 +49,7 @@ impl Module for QNet {
         let xs = self
             .net
             .forward(xs)?
-            .avg_pool2d(GRID_SIZE)?
+            .max_pool2d(GRID_SIZE)?
             .squeeze(D::Minus1)?
             .squeeze(D::Minus1)?;
         let advantage = self.advantage.forward(&xs)?;
