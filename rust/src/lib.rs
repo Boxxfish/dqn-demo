@@ -3,13 +3,19 @@ mod env;
 mod model;
 mod replay_buffer;
 
-use candle_core::{DType, Device, Module, Result, Tensor};
+use candle_core::{DType, Device, IndexOp, Module, Result, Tensor};
 use candle_nn::{VarBuilder, VarMap};
 use model::QNet;
 use safetensors::SafeTensors;
 use wasm_bindgen::prelude::*;
 
 use crate::env::{GRID_SIZE, NUM_CHANNELS};
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
 
 #[wasm_bindgen]
 pub struct DQN {
@@ -31,6 +37,9 @@ impl DQN {
                 .reshape(&[NUM_CHANNELS, GRID_SIZE, GRID_SIZE])?
                 .to_dtype(DType::F32)?
                 .unsqueeze(0)?;
+            for i in 0..6 {
+                log(&format!("{}", state.i(0)?.i(i)?));
+            }
             let q_vals = self.net.forward(&state)?.squeeze(0)?;
             q_vals.to_vec1()
         }()

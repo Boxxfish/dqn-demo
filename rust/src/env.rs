@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use rand::Rng;
 
 pub const GRID_SIZE: usize = 6;
@@ -5,8 +7,9 @@ const COIN_IDX: usize = 0;
 const PIT_IDX: usize = 1;
 const WALL_IDX: usize = 2;
 const BOX_IDX: usize = 3;
-pub const NUM_CHANNELS: usize = BOX_IDX + 1 + 3;
-pub const MAX_TIME: u32 = 32;
+pub const NUM_CHANNELS: usize = BOX_IDX + 1 + 2;
+pub const MAX_TIME: u32 = 16;
+pub const MAX_SAME: usize = 4; // How long an agent is allowed to stay in the same spot.
 
 pub type State = Vec<Vec<Vec<bool>>>;
 type Position = (usize, usize);
@@ -18,6 +21,7 @@ pub struct GridEnv {
     pub goal_pos: Position,
     pub agent_pos: Position,
     pub timer: u32,
+    pub pos_buf: VecDeque<Position>,
 }
 
 /// Returns the position of an empty cell.
@@ -37,6 +41,7 @@ impl GridEnv {
             goal_pos: (0, 0),
             agent_pos: (0, 0),
             timer: 0,
+            pos_buf: VecDeque::new(),
         }
     }
 
@@ -55,14 +60,15 @@ impl GridEnv {
                 }
             }
             if ref_grid.iter().filter(|&&c| c == 0).count() > 2
-                && ref_grid.iter().filter(|&&c| c == WALL_IDX + 1).count() < 23
-                && ref_grid.iter().filter(|&&c| c == PIT_IDX + 1).count() < 3
-                && ref_grid.iter().filter(|&&c| c == BOX_IDX + 1).count() < 3
+                && ref_grid.iter().filter(|&&c| c == WALL_IDX + 1).count()
+                    <= (GRID_SIZE * 4 - 4 + 2)
+                && ref_grid.iter().filter(|&&c| c == PIT_IDX + 1).count() <= 1
+                && ref_grid.iter().filter(|&&c| c == BOX_IDX + 1).count() <= 1
             {
                 break ref_grid;
             }
         };
-        let mut grid = vec![vec![vec![false; GRID_SIZE]; GRID_SIZE]; BOX_IDX + 2];
+        let mut grid = vec![vec![vec![false; GRID_SIZE]; GRID_SIZE]; BOX_IDX + 1];
         for (i, &val) in ref_grid.iter().enumerate() {
             let y = i / GRID_SIZE;
             let x = i % GRID_SIZE;
@@ -77,6 +83,7 @@ impl GridEnv {
             goal_pos,
             agent_pos,
             timer: 0,
+            pos_buf: VecDeque::new(),
         };
         self.get_obs()
     }
@@ -94,7 +101,7 @@ impl GridEnv {
 
         let mut x = (self.agent_pos.0 as i32 + dx).clamp(0, GRID_SIZE as i32) as usize;
         let mut y = (self.agent_pos.1 as i32 + dy).clamp(0, GRID_SIZE as i32) as usize;
-        let mut reward = 0.;
+        let mut reward = -0.01;
         let mut done = false;
 
         // Moving into a wall.
@@ -117,24 +124,35 @@ impl GridEnv {
         }
         // Moving into a coin.
         else if self.grid[COIN_IDX][y][x] {
-            reward += 1.;
+            reward += 0.1;
             self.grid[COIN_IDX][y][x] = false;
         }
         // Moving into the goal.
         else if (x, y) == self.goal_pos {
-            reward += 10.;
+            reward += 1.;
             done = true;
         }
         // Moving into a pit.
         else if self.grid[PIT_IDX][y][x] {
-            reward -= 10.;
+            reward -= 1.;
             done = true;
         }
 
+        // Check how long we've been in the same spot
         self.agent_pos = (x, y);
+        let mut trunc = self
+            .pos_buf
+            .iter()
+            .filter(|&&p| p == self.agent_pos)
+            .count()
+            == MAX_SAME;
+        if self.pos_buf.len() == MAX_SAME {
+            self.pos_buf.pop_front();
+        }
+        self.pos_buf.push_back(self.agent_pos);
 
         self.timer += 1;
-        let trunc = self.timer >= MAX_TIME;
+        trunc = trunc || self.timer >= MAX_TIME;
 
         (self.get_obs(), reward, done, trunc)
     }
@@ -155,23 +173,17 @@ impl GridEnv {
             for x in 0..GRID_SIZE {
                 if self.grid[COIN_IDX][y][x] {
                     print!("@");
-                }
-                else if self.grid[PIT_IDX][y][x] {
+                } else if self.grid[PIT_IDX][y][x] {
                     print!("!");
-                }
-                else if self.grid[WALL_IDX][y][x] {
+                } else if self.grid[WALL_IDX][y][x] {
                     print!("*");
-                }
-                else if self.grid[BOX_IDX][y][x] {
+                } else if self.grid[BOX_IDX][y][x] {
                     print!("O");
-                }
-                else if self.goal_pos == (x, y) {
+                } else if self.goal_pos == (x, y) {
                     print!("G");
-                }
-                else if self.agent_pos == (x, y) {
+                } else if self.agent_pos == (x, y) {
                     print!("A");
-                }
-                else {
+                } else {
                     print!(" ");
                 }
             }

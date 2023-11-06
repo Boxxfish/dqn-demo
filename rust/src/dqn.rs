@@ -34,8 +34,7 @@ pub fn train_dqn<M: Module, O: Optimizer>(
 
         // Train q network
         // q_opt.zero_grad();
-        // with torch.no_grad() {
-        let next_actions = q_net.forward(&states)?.argmax(1)?.squeeze(0)?;
+        let next_actions = q_net.forward(&states)?.argmax(1)?.squeeze(0)?.detach()?;
         let q_target = (rewards
             + discount
                 * (q_net_target
@@ -43,14 +42,13 @@ pub fn train_dqn<M: Module, O: Optimizer>(
                     .detach()?
                     .gather(&next_actions.unsqueeze(1)?, 1)?
                     .to_dtype(DType::F32)?
-                    * (1. - &dones.unsqueeze(1)?.to_dtype(DType::F32)?))?
+                    * (1. - &dones.unsqueeze(1)?))?
                     .squeeze(1)?)?;
-        // };
-        let diff = (q_net
+        let q_pred = q_net
             .forward(&prev_states)?
             .gather(&actions.unsqueeze(1)?, 1)?
-            .squeeze(1)?
-            - q_target)?;
+            .squeeze(1)?;
+        let diff = (&q_pred - q_target)?;
         let q_loss = (&diff * &diff)?.mean(0)?;
         q_opt.backward_step(&q_loss)?;
         total_q_loss += q_loss.to_scalar::<f32>()?;

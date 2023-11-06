@@ -170,7 +170,7 @@
 
   let dqn = null;
   const getState = (cells: number[][], agentPos: Position) => {
-    let state = Array(7 * 6 * 6);
+    let state = Array(6 * 6 * 6);
     const gridSize = 4;
     const gridSizeBorder = 6;
     for (let y = 0; y < gridSize; y++) {

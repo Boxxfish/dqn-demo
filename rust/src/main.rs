@@ -15,7 +15,7 @@ use nn::{AdamW, VarBuilder, VarMap};
 use rand::Rng;
 
 // Hyperparameters
-const TRAIN_STEPS: usize = 4;
+const TRAIN_STEPS: usize = 20;
 const ITERATIONS: usize = 10000;
 const TRAIN_ITERS: usize = 1; // Number of passes over the samples collected.
 const TRAIN_BATCH_SIZE: usize = 512; // Minibatch size while training models.
@@ -26,7 +26,7 @@ const MAX_EVAL_STEPS: usize = 300; // Max number of steps to take during each ev
 const Q_LR: f64 = 0.0001; // Learning rate of the q net.
 const WARMUP_STEPS: usize = 500; // For the first n number of steps, we will only sample randomly.
 const BUFFER_SIZE: usize = 10000; // Number of elements that can be stored in the buffer.
-const TARGET_UPDATE: usize = 500; // Number of iterations before updating Q target.
+const TARGET_UPDATE: usize = 100; // Number of iterations before updating Q target.
 
 fn process_obs(state: Vec<Vec<Vec<bool>>>) -> Result<Tensor> {
     Ok(Tensor::from_vec(
@@ -53,9 +53,11 @@ fn main() -> Result<()> {
     let act_space = 4;
     let mut vm = VarMap::new();
     let vs = VarBuilder::from_varmap(&vm, DType::F32, &Device::Cpu);
+    // let data = std::fs::read("temp/q_net_grid.safetensors")?;
+    // let vs = VarBuilder::from_buffered_safetensors(data, DType::F32, &Device::Cpu)?;
     let q_net = QNet::new(vs, obs_channels, act_space)?;
-    let target_vm = VarMap::new();
-    let target_vs = VarBuilder::from_varmap(&vm, DType::F32, &device);
+    let mut target_vm = VarMap::new();
+    let target_vs = VarBuilder::from_varmap(&target_vm, DType::F32, &device);
     let q_net_target = QNet::new(target_vs, obs_channels, act_space)?;
     let mut q_opt = AdamW::new_lr(vm.all_vars(), Q_LR)?;
 
@@ -71,14 +73,13 @@ fn main() -> Result<()> {
         let percent_done = step as f32 / ITERATIONS as f32;
 
         // Collect experience
-        // with torch.no_grad() {
         for _ in 0..TRAIN_STEPS {
             let action = if rng.gen::<f32>() < Q_EPSILON * f32::max(1.0 - percent_done, 0.05)
                 || step < WARMUP_STEPS
             {
                 rng.gen_range(0..act_space) as u32
             } else {
-                let q_vals = q_net.forward(&obs)?;
+                let q_vals = q_net.forward(&obs)?.detach()?;
                 q_vals.argmax(1)?.squeeze(0)?.to_scalar::<u32>()?
             };
             // train_env.render();
@@ -96,7 +97,6 @@ fn main() -> Result<()> {
                 obs = process_obs(train_env.reset())?;
             }
         }
-        // }
 
         // Train
         if buffer.filled {
@@ -144,13 +144,15 @@ fn main() -> Result<()> {
 
             // Update Q target
             if (step + 1) % TARGET_UPDATE == 0 {
-                for (v, target_v) in vm.all_vars().iter().zip(target_vm.all_vars()) {
-                    target_v.set(v.as_tensor())?;
+                for (name, v) in vm.data().lock().unwrap().iter() {
+                    target_vm.set_one(name, v.as_tensor().clone())?;
                 }
             }
 
             // Save network
-            vm.save("temp/q_net_grid.safetensors")?;
+            if (step + 1) % 10 == 0 {
+                vm.save("temp/q_net_grid.safetensors")?;
+            }
         }
     }
     Ok(())

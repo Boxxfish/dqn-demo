@@ -1,6 +1,9 @@
 use anyhow::{Error, Result};
 use candle_core::{DType, Device, IndexOp, Shape, Tensor};
-use rand::Rng;
+use rand::{
+    seq::{IteratorRandom, SliceRandom},
+    Rng,
+};
 
 /// A replay buffer for use with off policy algorithms.
 /// Stores transitions and generates mini batches.
@@ -56,10 +59,9 @@ impl ReplayBuffer {
     ) {
         move || -> Result<_> {
             let batch_size = dones.len();
-            let d = candle_core::Device::Cpu;
-            let indices = ((self.next..(self.next + batch_size))
-                .map(|i| (i % self.capacity) as usize)
-                .collect::<Vec<_>>());
+            let indices = (self.next..(self.next + batch_size))
+                .map(|i| i % self.capacity)
+                .collect::<Vec<_>>();
             for (val_i, &i) in indices.iter().enumerate() {
                 if self.filled {
                     self.states[i] = states.i(val_i)?;
@@ -67,8 +69,7 @@ impl ReplayBuffer {
                     self.actions[i] = actions.i(val_i)?;
                     self.rewards[i] = rewards[val_i];
                     self.dones[i] = dones[val_i];
-                }
-                else {
+                } else {
                     self.states.push(states.i(val_i)?);
                     self.next_states.push(next_states.i(val_i)?);
                     self.actions.push(actions.i(val_i)?);
@@ -91,9 +92,7 @@ impl ReplayBuffer {
         batch_size: usize,
     ) -> Result<(Tensor, Tensor, Tensor, Tensor, Tensor), Error> {
         let mut rng = rand::thread_rng();
-        let indices = (0..batch_size)
-            .map(|_| rng.gen_range(0..self.capacity) as usize)
-            .collect::<Vec<_>>();
+        let indices: Vec<_> = (0..self.capacity).choose_multiple(&mut rng, batch_size);
         let mut rand_states_vec = Vec::new();
         let mut rand_next_states_vec = Vec::new();
         let mut rand_actions_vec = Vec::new();
@@ -104,7 +103,7 @@ impl ReplayBuffer {
             rand_next_states_vec.push(&self.next_states[i]);
             rand_actions_vec.push(&self.actions[i]);
             rand_rewards_vec.push(self.rewards[i]);
-            rand_dones_vec.push(if self.dones[i] { 1. } else { 0. });
+            rand_dones_vec.push(if self.dones[i] { 1_f32 } else { 0. });
         }
         Ok((
             Tensor::stack(&rand_states_vec, 0)?,

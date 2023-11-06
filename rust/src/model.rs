@@ -1,7 +1,6 @@
 use anyhow::Result;
 use candle_core::{Module, Tensor, D};
 use nn::VarBuilder;
-use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::env::GRID_SIZE;
 use candle_nn as nn;
@@ -18,7 +17,7 @@ impl QNet {
         let net = nn::seq()
             .add(nn::conv2d(
                 in_channels,
-                8,
+                16,
                 3,
                 nn::Conv2dConfig {
                     padding: 1,
@@ -28,7 +27,7 @@ impl QNet {
             )?)
             .add(nn::Activation::Relu)
             .add(nn::conv2d(
-                8,
+                16,
                 32,
                 3,
                 nn::Conv2dConfig {
@@ -60,7 +59,7 @@ impl Module for QNet {
         let xs = self
             .net
             .forward(xs)?
-            .max_pool2d(GRID_SIZE)?
+            .avg_pool2d(GRID_SIZE)?
             .squeeze(D::Minus1)?
             .squeeze(D::Minus1)?;
         let advantage = self.advantage.forward(&xs)?;
