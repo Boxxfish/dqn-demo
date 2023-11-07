@@ -24,7 +24,7 @@ pub fn train_dqn<M: Module, O: Optimizer>(
     }
 
     for _ in 0..train_iters {
-        let (indices, probs, prev_states, states, actions, rewards, dones) =
+        let (indices, probs, prev_states, states, actions, rewards, dones, masks) =
             buffer.sample(train_batch_size)?;
 
         // Move batch to device if applicable
@@ -33,10 +33,11 @@ pub fn train_dqn<M: Module, O: Optimizer>(
         let actions = actions.to_device(device)?;
         let rewards = rewards.to_device(device)?;
         let dones = dones.to_device(device)?;
+        let masks = masks.to_device(device)?;
 
         // Train q network
         // q_opt.zero_grad();
-        let next_actions = q_net.forward(&states)?.argmax(1)?.detach()?.squeeze(0)?;
+        let next_actions = (q_net.forward(&states)? * (1. - &masks)? + (&masks * -f64::INFINITY)?)?.argmax(1)?.detach()?.squeeze(0)?;
         let q_target = (&rewards
             + discount
                 * (q_net_target

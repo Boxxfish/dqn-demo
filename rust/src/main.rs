@@ -68,9 +68,12 @@ fn main() -> Result<()> {
         BUFFER_SIZE,
     );
 
-    let mut obs = process_obs(train_env.reset())?;
+    let (obs_, mut masks) = train_env.reset();
+    let mut obs = process_obs(obs_)?;
     let mut rng = rand::thread_rng();
-    for step in (0..ITERATIONS).progress_with_style(ProgressStyle::with_template("[{eta_precise}] {wide_bar} {pos:>7}/{len:7}")?) {
+    for step in (0..ITERATIONS).progress_with_style(ProgressStyle::with_template(
+        "[{eta_precise}] {wide_bar} {pos:>7}/{len:7}",
+    )?) {
         let percent_done = step as f32 / ITERATIONS as f32;
 
         // Collect experience
@@ -80,11 +83,16 @@ fn main() -> Result<()> {
             {
                 rng.gen_range(0..act_space) as u32
             } else {
-                let q_vals = q_net.forward(&obs)?.detach()?;
-                q_vals.argmax(1)?.squeeze(0)?.to_scalar::<u32>()?
+                let masks_tensor = Tensor::new(
+                    masks.iter().map(|&b| b as u8 as f32).collect::<Vec<_>>(),
+                    &Device::Cpu,
+                )?;
+                let q_vals = (q_net.forward(&obs)?.detach()?.squeeze(0)?
+                    * (1. - &masks_tensor)? + (&masks_tensor * -f64::INFINITY)?)?;
+                q_vals.argmax(0)?.to_scalar::<u32>()?
             };
             // train_env.render();
-            let (obs_, reward, done, trunc) = train_env.step(action);
+            let (obs_, reward, done, trunc, next_masks) = train_env.step(action);
             let next_obs = process_obs(obs_)?;
             buffer.insert_step(
                 obs,
@@ -92,10 +100,14 @@ fn main() -> Result<()> {
                 Tensor::new(&[action], &Device::Cpu)?,
                 &[reward],
                 &[done],
+                &[next_masks.clone()],
             );
             obs = next_obs;
+            masks = next_masks;
             if done || trunc {
-                obs = process_obs(train_env.reset())?;
+                let (obs_, masks_) = train_env.reset();
+                obs = process_obs(obs_)?;
+                masks = masks_;
             }
         }
 
@@ -119,21 +131,29 @@ fn main() -> Result<()> {
             if step % 100 == 0 {
                 // with torch.no_grad(){
                 let mut reward_total = 0.;
-                let obs_ = test_env.reset();
+                let (obs_, mut eval_masks) = test_env.reset();
                 let mut eval_obs = process_obs(obs_)?;
                 for _ in 0..EVAL_STEPS {
                     for _ in 0..MAX_EVAL_STEPS {
-                        let q_vals = q_net.forward(&eval_obs)?;
-                        let action = q_vals.argmax(1)?.squeeze(0)?.to_scalar()?;
+                        let masks_tensor = Tensor::new(
+                            eval_masks.iter().map(|&b| b as u8 as f32).collect::<Vec<_>>(),
+                            &Device::Cpu,
+                        )?;
+                        let q_vals = (q_net.forward(&eval_obs)?.detach()?.squeeze(0)?
+                            * (1. - &masks_tensor)? + (&masks_tensor * -f64::INFINITY)?)?;
+                        let action = q_vals.argmax(0)?.to_scalar()?;
                         // pred_reward_total += (
                         //     q_net(eval_obs.unsqueeze(0)).squeeze().max(0).values.item()
                         // );
-                        let (obs_, reward, eval_done, eval_trunc) = test_env.step(action);
+                        let (obs_, reward, eval_done, eval_trunc, next_eval_masks) =
+                            test_env.step(action);
                         eval_obs = process_obs(obs_)?;
+                        eval_masks = next_eval_masks;
                         reward_total += reward;
                         if eval_done || eval_trunc {
-                            let obs_ = test_env.reset();
+                            let (obs_, masks_) = test_env.reset();
                             eval_obs = process_obs(obs_)?;
+                            eval_masks = masks_;
                             break;
                         }
                     }

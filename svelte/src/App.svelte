@@ -240,8 +240,26 @@
     return state;
   };
 
+  const evalState = (cells: number[][], state) => {
+    const qVals: Float32Array = dqn.eval_state(state);
+
+    // Masking
+    if (agentPos[0] == 0 || cells[agentPos[1]][agentPos[0] - 1] == WALL) {
+      qVals[0] = -Infinity;
+    }
+    if (agentPos[0] == 3 || cells[agentPos[1]][agentPos[0] + 1] == WALL) {
+      qVals[1] = -Infinity;
+    }
+    if (agentPos[1] == 0 || cells[agentPos[1] - 1][agentPos[0]] == WALL) {
+      qVals[2] = -Infinity;
+    }
+    if (agentPos[1] == 3 || cells[agentPos[1] + 1][agentPos[0]] == WALL) {
+      qVals[3] = -Infinity;
+    }
+    return qVals;
+  };
   $: state = getState(cells, agentPos);
-  $: qVals = dqn ? dqn.eval_state(state) : [];
+  $: qVals = dqn ? evalState(cells, state) : [];
   $: action = qVals.length > 0 ? qVals.indexOf(Math.max(...qVals)) : 0;
   const stepDQN = () => {
     if (dqn) {
@@ -302,16 +320,16 @@
                 : ''}"
             />
             {#if x === agentPos[0] - 1 && y == agentPos[1]}
-                <span class="q-value">{qVals[0]?.toFixed(2)}</span>
+              <span class="q-value">{qVals[0]?.toFixed(2)}</span>
             {/if}
             {#if x === agentPos[0] + 1 && y == agentPos[1]}
-                <span class="q-value">{qVals[1]?.toFixed(2)}</span>
+              <span class="q-value">{qVals[1]?.toFixed(2)}</span>
             {/if}
             {#if x === agentPos[0] && y == agentPos[1] - 1}
-                <span class="q-value">{qVals[2]?.toFixed(2)}</span>
+              <span class="q-value">{qVals[2]?.toFixed(2)}</span>
             {/if}
             {#if x === agentPos[0] && y == agentPos[1] + 1}
-                <span class="q-value">{qVals[3]?.toFixed(2)}</span>
+              <span class="q-value">{qVals[3]?.toFixed(2)}</span>
             {/if}
           </div>
         </div>

@@ -5,7 +5,16 @@ use rand::{
     Rng,
 };
 
-pub type Samples = (Vec<usize>, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor);
+pub type Samples = (
+    Vec<usize>,
+    Tensor,
+    Tensor,
+    Tensor,
+    Tensor,
+    Tensor,
+    Tensor,
+    Tensor,
+);
 
 /// A replay buffer for use with off policy algorithms.
 /// Stores transitions and generates mini batches.
@@ -17,6 +26,7 @@ pub struct ReplayBuffer {
     pub actions: Vec<Tensor>,
     pub rewards: Vec<f32>,
     pub dones: Vec<bool>,
+    pub masks: Vec<Vec<bool>>,
     pub priorities: Vec<f32>,
     pub filled: bool,
     pub max_priority: f32,
@@ -32,6 +42,7 @@ impl ReplayBuffer {
             let next_states = Vec::new();
             let actions = Vec::new();
             let rewards = Vec::new();
+            let masks = Vec::new();
             let priorities = Vec::new();
             // Technically this is the "terminated" flag
             let dones = Vec::new();
@@ -48,6 +59,7 @@ impl ReplayBuffer {
                 filled,
                 max_priority: 0.1,
                 priorities,
+                masks,
             })
         }()
         .unwrap();
@@ -63,6 +75,7 @@ impl ReplayBuffer {
         actions: Tensor,
         rewards: &[f32],
         dones: &[bool],
+        masks: &[Vec<bool>],
     ) {
         move || -> Result<_> {
             let batch_size = dones.len();
@@ -76,6 +89,7 @@ impl ReplayBuffer {
                     self.actions[i] = actions.i(val_i)?;
                     self.rewards[i] = rewards[val_i];
                     self.dones[i] = dones[val_i];
+                    self.masks[i] = masks[val_i].clone();
                     self.priorities[i] = self.max_priority;
                 } else {
                     self.states.push(states.i(val_i)?);
@@ -83,6 +97,7 @@ impl ReplayBuffer {
                     self.actions.push(actions.i(val_i)?);
                     self.rewards.push(rewards[val_i]);
                     self.dones.push(dones[val_i]);
+                    self.masks.push(masks[val_i].clone());
                     self.priorities.push(self.max_priority);
                 }
             }
@@ -112,12 +127,20 @@ impl ReplayBuffer {
         let mut rand_actions_vec = Vec::new();
         let mut rand_rewards_vec = Vec::new();
         let mut rand_dones_vec = Vec::new();
+        let mut rand_masks_vec = Vec::new();
         for &i in &indices {
             rand_states_vec.push(&self.states[i]);
             rand_next_states_vec.push(&self.next_states[i]);
             rand_actions_vec.push(&self.actions[i]);
             rand_rewards_vec.push(self.rewards[i]);
             rand_dones_vec.push(if self.dones[i] { 1_f32 } else { 0. });
+            rand_masks_vec.push(Tensor::new(
+                self.masks[i]
+                    .iter()
+                    .map(|&b| b as u8 as f32)
+                    .collect::<Vec<_>>(),
+                &Device::Cpu,
+            )?);
         }
         let probs = Tensor::new(probs, &Device::Cpu)?.gather(
             &Tensor::new(
@@ -138,6 +161,7 @@ impl ReplayBuffer {
             Tensor::stack(&rand_actions_vec, 0)?,
             Tensor::new(rand_rewards_vec, &Device::Cpu)?,
             Tensor::new(rand_dones_vec, &Device::Cpu)?,
+            Tensor::stack(&rand_masks_vec, 0)?,
         ))
     }
 

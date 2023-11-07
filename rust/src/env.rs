@@ -8,8 +8,7 @@ const PIT_IDX: usize = 1;
 const WALL_IDX: usize = 2;
 const BOX_IDX: usize = 3;
 pub const NUM_CHANNELS: usize = BOX_IDX + 1 + 2;
-pub const MAX_TIME: u32 = 16;
-pub const MAX_SAME: usize = 4; // How long an agent is allowed to stay in the same spot.
+const MAX_TIME: u32 = 16;
 
 pub type State = Vec<Vec<Vec<bool>>>;
 type Position = (usize, usize);
@@ -45,37 +44,33 @@ impl GridEnv {
         }
     }
 
-    pub fn reset(&mut self) -> State {
+    pub fn reset(&mut self) -> (State, Vec<bool>) {
         let mut rng = rand::thread_rng();
-        let ref_grid = loop {
-            // let ref_grid = vec![
-            //     3, 3, 3, 3, 3, 3,
-            //     3, 0, 0, 3, 0, 3,
-            //     3, 1, 4, 0, 0, 3,
-            //     3, 1, 2, 3, 0, 3,
-            //     3, 0, 0, 3, 1, 3,
-            //     3, 3, 3, 3, 3, 3,
-            // ];
-            let mut ref_grid: Vec<_> = (0..(GRID_SIZE * GRID_SIZE))
-                .map(|_| rng.gen_range(0..(WALL_IDX + 2)))
-                .collect();
-            for y in 0..GRID_SIZE {
-                for x in 0..GRID_SIZE {
-                    if (1..GRID_SIZE - 1).contains(&x) && (1..GRID_SIZE - 1).contains(&y) {
-                        continue;
-                    }
-                    ref_grid[y * GRID_SIZE + x] = WALL_IDX + 1;
-                }
-            }
-            if ref_grid.iter().filter(|&&c| c == 0).count() > 2
-                && ref_grid.iter().filter(|&&c| c == WALL_IDX + 1).count()
-                    <= (GRID_SIZE * 4 - 4 + 2)
-                && ref_grid.iter().filter(|&&c| c == PIT_IDX + 1).count() <= 1
-                && ref_grid.iter().filter(|&&c| c == BOX_IDX + 1).count() <= 1
-            {
-                break ref_grid;
-            }
-        };
+        let ref_grid = vec![
+            3, 3, 3, 3, 3, 3, 3, 0, 0, 3, 0, 3, 3, 1, 0, 0, 0, 3, 3, 1, 2, 3, 0, 3, 3, 0, 0, 3, 1,
+            3, 3, 3, 3, 3, 3, 3,
+        ];
+        // let ref_grid = loop {
+        //     let mut ref_grid: Vec<_> = (0..(GRID_SIZE * GRID_SIZE))
+        //         .map(|_| rng.gen_range(0..(WALL_IDX + 2)))
+        //         .collect();
+        //     for y in 0..GRID_SIZE {
+        //         for x in 0..GRID_SIZE {
+        //             if (1..GRID_SIZE - 1).contains(&x) && (1..GRID_SIZE - 1).contains(&y) {
+        //                 continue;
+        //             }
+        //             ref_grid[y * GRID_SIZE + x] = WALL_IDX + 1;
+        //         }
+        //     }
+        //     if ref_grid.iter().filter(|&&c| c == 0).count() > 2
+        //         && ref_grid.iter().filter(|&&c| c == WALL_IDX + 1).count()
+        //             <= (GRID_SIZE * 4 - 4 + 2)
+        //         && ref_grid.iter().filter(|&&c| c == PIT_IDX + 1).count() <= 1
+        //         && ref_grid.iter().filter(|&&c| c == BOX_IDX + 1).count() <= 1
+        //     {
+        //         break ref_grid;
+        //     }
+        // };
         let mut grid = vec![vec![vec![false; GRID_SIZE]; GRID_SIZE]; BOX_IDX + 1];
         for (i, &val) in ref_grid.iter().enumerate() {
             let y = i / GRID_SIZE;
@@ -93,10 +88,17 @@ impl GridEnv {
             timer: 0,
             pos_buf: VecDeque::new(),
         };
-        self.get_obs()
+        let (x, y) = agent_pos;
+        let masks = vec![
+            self.grid[WALL_IDX][y][x - 1],
+            self.grid[WALL_IDX][y][x + 1],
+            self.grid[WALL_IDX][y - 1][x],
+            self.grid[WALL_IDX][y + 1][x],
+        ];
+        (self.get_obs(), masks)
     }
 
-    pub fn step(&mut self, action: u32) -> (State, f32, bool, bool) {
+    pub fn step(&mut self, action: u32) -> (State, f32, bool, bool, Vec<bool>) {
         let mut dx = 0;
         let mut dy = 0;
         match action {
@@ -146,23 +148,18 @@ impl GridEnv {
             done = true;
         }
 
-        // Check how long we've been in the same spot
+        let masks = vec![
+            self.grid[WALL_IDX][y][x - 1],
+            self.grid[WALL_IDX][y][x + 1],
+            self.grid[WALL_IDX][y - 1][x],
+            self.grid[WALL_IDX][y + 1][x],
+        ];
         self.agent_pos = (x, y);
-        let mut trunc = self
-            .pos_buf
-            .iter()
-            .filter(|&&p| p == self.agent_pos)
-            .count()
-            == MAX_SAME;
-        if self.pos_buf.len() == MAX_SAME {
-            self.pos_buf.pop_front();
-        }
-        self.pos_buf.push_back(self.agent_pos);
 
         self.timer += 1;
-        trunc = trunc || self.timer >= MAX_TIME;
+        let trunc = self.timer >= MAX_TIME;
 
-        (self.get_obs(), reward, done, trunc)
+        (self.get_obs(), reward, done, trunc, masks)
     }
 
     fn get_obs(&self) -> State {
