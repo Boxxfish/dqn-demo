@@ -16,7 +16,7 @@ use rand::Rng;
 
 // Hyperparameters
 const TRAIN_STEPS: usize = 20;
-const ITERATIONS: usize = 10000;
+const ITERATIONS: usize = 20000;
 const TRAIN_ITERS: usize = 1; // Number of passes over the samples collected.
 const TRAIN_BATCH_SIZE: usize = 64; // Minibatch size while training models.
 const DISCOUNT: f64 = 0.99; // Discount factor applied to rewards.

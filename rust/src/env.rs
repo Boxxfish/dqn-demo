@@ -48,33 +48,33 @@ impl GridEnv {
     pub fn reset(&mut self) -> State {
         let mut rng = rand::thread_rng();
         let ref_grid = loop {
-            let ref_grid = vec![
-                3, 3, 3, 3, 3, 3,
-                3, 0, 0, 3, 0, 3,
-                3, 1, 1, 1, 1, 3,
-                3, 1, 2, 3, 0, 3,
-                3, 0, 0, 3, 1, 3,
-                3, 3, 3, 3, 3, 3,
-            ];
-            // let mut ref_grid: Vec<_> = (0..(GRID_SIZE * GRID_SIZE))
-            //     .map(|_| rng.gen_range(0..(BOX_IDX + 2)))
-            //     .collect();
-            // for y in 0..GRID_SIZE {
-            //     for x in 0..GRID_SIZE {
-            //         if (1..GRID_SIZE - 1).contains(&x) && (1..GRID_SIZE - 1).contains(&y) {
-            //             continue;
-            //         }
-            //         ref_grid[y * GRID_SIZE + x] = WALL_IDX + 1;
-            //     }
-            // }
-            // if ref_grid.iter().filter(|&&c| c == 0).count() > 2
-            //     && ref_grid.iter().filter(|&&c| c == WALL_IDX + 1).count()
-            //         <= (GRID_SIZE * 4 - 4 + 2)
-            //     && ref_grid.iter().filter(|&&c| c == PIT_IDX + 1).count() <= 1
-            //     && ref_grid.iter().filter(|&&c| c == BOX_IDX + 1).count() <= 1
-            // {
+            // let ref_grid = vec![
+            //     3, 3, 3, 3, 3, 3,
+            //     3, 0, 0, 3, 0, 3,
+            //     3, 1, 4, 0, 0, 3,
+            //     3, 1, 2, 3, 0, 3,
+            //     3, 0, 0, 3, 1, 3,
+            //     3, 3, 3, 3, 3, 3,
+            // ];
+            let mut ref_grid: Vec<_> = (0..(GRID_SIZE * GRID_SIZE))
+                .map(|_| rng.gen_range(0..(WALL_IDX + 2)))
+                .collect();
+            for y in 0..GRID_SIZE {
+                for x in 0..GRID_SIZE {
+                    if (1..GRID_SIZE - 1).contains(&x) && (1..GRID_SIZE - 1).contains(&y) {
+                        continue;
+                    }
+                    ref_grid[y * GRID_SIZE + x] = WALL_IDX + 1;
+                }
+            }
+            if ref_grid.iter().filter(|&&c| c == 0).count() > 2
+                && ref_grid.iter().filter(|&&c| c == WALL_IDX + 1).count()
+                    <= (GRID_SIZE * 4 - 4 + 2)
+                && ref_grid.iter().filter(|&&c| c == PIT_IDX + 1).count() <= 1
+                && ref_grid.iter().filter(|&&c| c == BOX_IDX + 1).count() <= 1
+            {
                 break ref_grid;
-            // }
+            }
         };
         let mut grid = vec![vec![vec![false; GRID_SIZE]; GRID_SIZE]; BOX_IDX + 1];
         for (i, &val) in ref_grid.iter().enumerate() {
@@ -84,8 +84,8 @@ impl GridEnv {
                 grid[val - 1][y][x] = true;
             }
         }
-        let goal_pos = (4, 1);//get_empty(&ref_grid, &[]);
-        let agent_pos = (1, 4);//get_empty(&ref_grid, &[goal_pos]);
+        let goal_pos = get_empty(&ref_grid, &[]);
+        let agent_pos = get_empty(&ref_grid, &[goal_pos]);
         *self = Self {
             grid,
             goal_pos,
@@ -138,7 +138,6 @@ impl GridEnv {
         // Moving into the goal.
         else if (x, y) == self.goal_pos {
             reward += 1.;
-            println!("Found goal!");
             done = true;
         }
         // Moving into a pit.
