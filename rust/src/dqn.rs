@@ -4,6 +4,8 @@ use candle_nn::{Optimizer, VarBuilder, VarMap};
 
 use crate::replay_buffer::ReplayBuffer;
 
+const INFINITY: f64 = 9999.9;
+
 /// Performs the DQN training loop.
 #[allow(clippy::too_many_arguments)]
 pub fn train_dqn<M: Module, O: Optimizer>(
@@ -37,7 +39,7 @@ pub fn train_dqn<M: Module, O: Optimizer>(
 
         // Train q network
         // q_opt.zero_grad();
-        let next_actions = (q_net.forward(&states)? * (1. - &masks)? + (&masks * -f64::INFINITY)?)?
+        let next_actions = (q_net.forward(&states)? * (1. - &masks)? + (&masks * -INFINITY)?)?
             .argmax(1)?
             .detach()?
             .squeeze(0)?;

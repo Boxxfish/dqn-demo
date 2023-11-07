@@ -72,7 +72,29 @@ impl QNet {
             vs.pp("conv1"),
         )?);
         let rep_net = nn::seq()
-            .add(skip(conv_features, vs.pp("skip1"))?);
+        .add(nn::Activation::Relu)
+            .add(nn::conv2d(
+                conv_features,
+                conv_features,
+                3,
+                nn::Conv2dConfig {
+                    padding: 1,
+                    ..Default::default()
+                },
+                vs.pp("conv2"),
+            )?)
+            .add(nn::Activation::Relu)
+            .add(nn::conv2d(
+                conv_features,
+                conv_features,
+                3,
+                nn::Conv2dConfig {
+                    padding: 1,
+                    ..Default::default()
+                },
+                vs.pp("conv3"),
+            )?)
+            .add(nn::Activation::Relu);
         let out_net = nn::conv2d(conv_features, 32, 3, Default::default(), vs.pp("conv_out"))?;
         let advantage = nn::seq()
             .add(nn::linear(32, 32, vs.pp("a_ln1"))?)

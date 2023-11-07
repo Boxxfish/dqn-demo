@@ -79,8 +79,8 @@ impl GridEnv {
                 grid[val - 1][y][x] = true;
             }
         }
-        let goal_pos = get_empty(&ref_grid, &[]);
-        let agent_pos = get_empty(&ref_grid, &[goal_pos]);
+        let goal_pos = (4, 1);//get_empty(&ref_grid, &[]);
+        let agent_pos = (1, 4);//get_empty(&ref_grid, &[goal_pos]);
         *self = Self {
             grid,
             goal_pos,
@@ -139,6 +139,7 @@ impl GridEnv {
         }
         // Moving into the goal.
         else if (x, y) == self.goal_pos {
+            println!("Test");
             reward += 1.;
             done = true;
         }

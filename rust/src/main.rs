@@ -12,7 +12,9 @@ use env::{GridEnv, GRID_SIZE, NUM_CHANNELS};
 use indicatif::{ProgressIterator, ProgressStyle};
 use model::QNet;
 use nn::{AdamW, VarBuilder, VarMap};
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
+
+const INFINITY: f64 = 9999.9;
 
 // Hyperparameters
 const TRAIN_STEPS: usize = 20;
@@ -23,7 +25,7 @@ const DISCOUNT: f64 = 0.99; // Discount factor applied to rewards.
 const Q_EPSILON: f32 = 0.8; // Epsilon for epsilon greedy strategy. This gets annealed over time.
 const EVAL_STEPS: usize = 8; // Number of eval runs to average over.
 const MAX_EVAL_STEPS: usize = 300; // Max number of steps to take during each eval run.
-const Q_LR: f64 = 0.00003; // Learning rate of the q net.
+const Q_LR: f64 = 0.0001; // Learning rate of the q net.
 const WARMUP_STEPS: usize = 500; // For the first n number of steps, we will only sample randomly.
 const BUFFER_SIZE: usize = 10000; // Number of elements that can be stored in the buffer.
 const TARGET_UPDATE: usize = 200; // Number of iterations before updating Q target.
@@ -47,7 +49,8 @@ fn mask_to_tensor(mask: &[bool]) -> candle_core::Result<Tensor> {
     Tensor::new(
         mask.iter().map(|&b| b as u8 as f32).collect::<Vec<_>>(),
         &Device::Cpu,
-    )?.unsqueeze(0)
+    )?
+    .unsqueeze(0)
 }
 
 fn main() -> Result<()> {
@@ -89,13 +92,22 @@ fn main() -> Result<()> {
             let action = if rng.gen::<f32>() < Q_EPSILON * f32::max(1.0 - percent_done, 0.05)
                 || step < WARMUP_STEPS
             {
-                rng.gen_range(0..act_space) as u32
+                let indices: Vec<_> = mask
+                    .squeeze(0)?
+                    .to_vec1::<f32>()?
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(a, t)| if *t < 0.5 { Some(a) } else { None })
+                    .collect();
+                *(indices.choose(&mut rng).unwrap()) as u32
             } else {
-                let q_vals = (q_net.forward(&obs)?.detach()?
-                    * (1. - &mask)? + (&mask * -f64::INFINITY)?)?;
+                let q_vals =
+                    (q_net.forward(&obs)?.detach()? * (1. - &mask)? + (&mask * -INFINITY)?)?;
                 q_vals.argmax(1)?.squeeze(0)?.to_scalar::<u32>()?
             };
-            // train_env.render();
+            // if step >= WARMUP_STEPS {
+            //     train_env.render();
+            // }
             let (obs_, reward, done, trunc, next_mask) = train_env.step(action);
             let next_obs = process_obs(obs_)?;
             let next_mask = mask_to_tensor(&next_mask)?;
@@ -138,18 +150,25 @@ fn main() -> Result<()> {
                 let mut reward_total = 0.;
                 let (obs_, mut eval_masks) = test_env.reset();
                 let mut eval_obs = process_obs(obs_)?;
-                for _ in 0..EVAL_STEPS {
+                for i in 0..EVAL_STEPS {
                     for _ in 0..MAX_EVAL_STEPS {
                         let masks_tensor = Tensor::new(
-                            eval_masks.iter().map(|&b| b as u8 as f32).collect::<Vec<_>>(),
+                            eval_masks
+                                .iter()
+                                .map(|&b| b as u8 as f32)
+                                .collect::<Vec<_>>(),
                             &Device::Cpu,
                         )?;
                         let q_vals = (q_net.forward(&eval_obs)?.detach()?.squeeze(0)?
-                            * (1. - &masks_tensor)? + (&masks_tensor * -f64::INFINITY)?)?;
+                            * (1. - &masks_tensor)?
+                            + (&masks_tensor * -INFINITY)?)?;
                         let action = q_vals.argmax(0)?.to_scalar()?;
                         // pred_reward_total += (
                         //     q_net(eval_obs.unsqueeze(0)).squeeze().max(0).values.item()
                         // );
+                        // if i == 0 {
+                        //     test_env.render();
+                        // }
                         let (obs_, reward, eval_done, eval_trunc, next_eval_masks) =
                             test_env.step(action);
                         eval_obs = process_obs(obs_)?;
