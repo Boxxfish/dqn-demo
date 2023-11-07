@@ -43,6 +43,13 @@ fn process_obs(state: Vec<Vec<Vec<bool>>>) -> Result<Tensor> {
     .unsqueeze(0)?)
 }
 
+fn mask_to_tensor(mask: &[bool]) -> candle_core::Result<Tensor> {
+    Tensor::new(
+        mask.iter().map(|&b| b as u8 as f32).collect::<Vec<_>>(),
+        &Device::Cpu,
+    )?.unsqueeze(0)
+}
+
 fn main() -> Result<()> {
     let device = Device::Cpu;
 
@@ -68,8 +75,9 @@ fn main() -> Result<()> {
         BUFFER_SIZE,
     );
 
-    let (obs_, mut masks) = train_env.reset();
+    let (obs_, mask_) = train_env.reset();
     let mut obs = process_obs(obs_)?;
+    let mut mask = mask_to_tensor(&mask_)?;
     let mut rng = rand::thread_rng();
     for step in (0..ITERATIONS).progress_with_style(ProgressStyle::with_template(
         "[{eta_precise}] {wide_bar} {pos:>7}/{len:7}",
@@ -83,31 +91,28 @@ fn main() -> Result<()> {
             {
                 rng.gen_range(0..act_space) as u32
             } else {
-                let masks_tensor = Tensor::new(
-                    masks.iter().map(|&b| b as u8 as f32).collect::<Vec<_>>(),
-                    &Device::Cpu,
-                )?;
-                let q_vals = (q_net.forward(&obs)?.detach()?.squeeze(0)?
-                    * (1. - &masks_tensor)? + (&masks_tensor * -f64::INFINITY)?)?;
-                q_vals.argmax(0)?.to_scalar::<u32>()?
+                let q_vals = (q_net.forward(&obs)?.detach()?
+                    * (1. - &mask)? + (&mask * -f64::INFINITY)?)?;
+                q_vals.argmax(1)?.squeeze(0)?.to_scalar::<u32>()?
             };
             // train_env.render();
-            let (obs_, reward, done, trunc, next_masks) = train_env.step(action);
+            let (obs_, reward, done, trunc, next_mask) = train_env.step(action);
             let next_obs = process_obs(obs_)?;
+            let next_mask = mask_to_tensor(&next_mask)?;
             buffer.insert_step(
                 obs,
                 next_obs.clone(),
                 Tensor::new(&[action], &Device::Cpu)?,
                 &[reward],
                 &[done],
-                &[next_masks.clone()],
+                next_mask.clone(),
             );
             obs = next_obs;
-            masks = next_masks;
+            mask = next_mask;
             if done || trunc {
-                let (obs_, masks_) = train_env.reset();
+                let (obs_, mask_) = train_env.reset();
                 obs = process_obs(obs_)?;
-                masks = masks_;
+                mask = mask_to_tensor(&mask_)?;
             }
         }
 

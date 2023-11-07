@@ -26,7 +26,7 @@ pub struct ReplayBuffer {
     pub actions: Vec<Tensor>,
     pub rewards: Vec<f32>,
     pub dones: Vec<bool>,
-    pub masks: Vec<Vec<bool>>,
+    pub masks: Vec<Tensor>,
     pub priorities: Vec<f32>,
     pub filled: bool,
     pub max_priority: f32,
@@ -75,7 +75,7 @@ impl ReplayBuffer {
         actions: Tensor,
         rewards: &[f32],
         dones: &[bool],
-        masks: &[Vec<bool>],
+        masks: Tensor,
     ) {
         move || -> Result<_> {
             let batch_size = dones.len();
@@ -89,7 +89,7 @@ impl ReplayBuffer {
                     self.actions[i] = actions.i(val_i)?;
                     self.rewards[i] = rewards[val_i];
                     self.dones[i] = dones[val_i];
-                    self.masks[i] = masks[val_i].clone();
+                    self.masks[i] = masks.i(val_i)?;
                     self.priorities[i] = self.max_priority;
                 } else {
                     self.states.push(states.i(val_i)?);
@@ -97,7 +97,7 @@ impl ReplayBuffer {
                     self.actions.push(actions.i(val_i)?);
                     self.rewards.push(rewards[val_i]);
                     self.dones.push(dones[val_i]);
-                    self.masks.push(masks[val_i].clone());
+                    self.masks.push(masks.i(val_i)?);
                     self.priorities.push(self.max_priority);
                 }
             }
@@ -134,13 +134,7 @@ impl ReplayBuffer {
             rand_actions_vec.push(&self.actions[i]);
             rand_rewards_vec.push(self.rewards[i]);
             rand_dones_vec.push(if self.dones[i] { 1_f32 } else { 0. });
-            rand_masks_vec.push(Tensor::new(
-                self.masks[i]
-                    .iter()
-                    .map(|&b| b as u8 as f32)
-                    .collect::<Vec<_>>(),
-                &Device::Cpu,
-            )?);
+            rand_masks_vec.push(&self.masks[i]);
         }
         let probs = Tensor::new(probs, &Device::Cpu)?.gather(
             &Tensor::new(
