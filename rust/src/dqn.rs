@@ -37,7 +37,10 @@ pub fn train_dqn<M: Module, O: Optimizer>(
 
         // Train q network
         // q_opt.zero_grad();
-        let next_actions = (q_net.forward(&states)? * (1. - &masks)? + (&masks * -f64::INFINITY)?)?.argmax(1)?.detach()?.squeeze(0)?;
+        let next_actions = (q_net.forward(&states)? * (1. - &masks)? + (&masks * -f64::INFINITY)?)?
+            .argmax(1)?
+            .detach()?
+            .squeeze(0)?;
         let q_target = (&rewards
             + discount
                 * (q_net_target

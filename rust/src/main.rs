@@ -16,17 +16,17 @@ use rand::Rng;
 
 // Hyperparameters
 const TRAIN_STEPS: usize = 20;
-const ITERATIONS: usize = 20000;
+const ITERATIONS: usize = 10000;
 const TRAIN_ITERS: usize = 1; // Number of passes over the samples collected.
 const TRAIN_BATCH_SIZE: usize = 64; // Minibatch size while training models.
 const DISCOUNT: f64 = 0.99; // Discount factor applied to rewards.
 const Q_EPSILON: f32 = 0.8; // Epsilon for epsilon greedy strategy. This gets annealed over time.
 const EVAL_STEPS: usize = 8; // Number of eval runs to average over.
 const MAX_EVAL_STEPS: usize = 300; // Max number of steps to take during each eval run.
-const Q_LR: f64 = 0.0001; // Learning rate of the q net.
+const Q_LR: f64 = 0.00003; // Learning rate of the q net.
 const WARMUP_STEPS: usize = 500; // For the first n number of steps, we will only sample randomly.
 const BUFFER_SIZE: usize = 10000; // Number of elements that can be stored in the buffer.
-const TARGET_UPDATE: usize = 500; // Number of iterations before updating Q target.
+const TARGET_UPDATE: usize = 200; // Number of iterations before updating Q target.
 const START_PRIORITY: f32 = 0.4; // Priority to start with, for priority sampling.
 
 fn process_obs(state: Vec<Vec<Vec<bool>>>) -> Result<Tensor> {

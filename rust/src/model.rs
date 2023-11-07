@@ -23,6 +23,7 @@ impl Module for Skip {
 /// Creates a skip connection.
 fn skip(features: usize, vs: VarBuilder) -> candle_core::Result<Skip> {
     let module = nn::seq()
+        .add(nn::Activation::Relu)
         .add(nn::conv2d(
             features,
             features,
@@ -62,7 +63,7 @@ impl QNet {
             padding: 1,
             ..Default::default()
         };
-        let conv_features = 16;
+        let conv_features = 32;
         let net = nn::seq().add(nn::conv2d(
             in_channels,
             conv_features,
@@ -71,8 +72,7 @@ impl QNet {
             vs.pp("conv1"),
         )?);
         let rep_net = nn::seq()
-            .add(skip(conv_features, vs.pp("skip1"))?)
-            .add(skip(conv_features, vs.pp("skip2"))?);
+            .add(skip(conv_features, vs.pp("skip1"))?);
         let out_net = nn::conv2d(conv_features, 32, 3, Default::default(), vs.pp("conv_out"))?;
         let advantage = nn::seq()
             .add(nn::linear(32, 32, vs.pp("a_ln1"))?)
