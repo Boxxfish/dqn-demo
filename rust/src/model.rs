@@ -1,9 +1,6 @@
 use anyhow::Result;
 use candle_core::{Module, Tensor, D};
-use nn::{
-    var_builder::{Backend, VarBuilderArgs},
-    VarBuilder,
-};
+use nn::VarBuilder;
 
 use crate::env::GRID_SIZE;
 use candle_nn as nn;
@@ -72,29 +69,8 @@ impl QNet {
             vs.pp("conv1"),
         )?);
         let rep_net = nn::seq()
-        .add(nn::Activation::Relu)
-            .add(nn::conv2d(
-                conv_features,
-                conv_features,
-                3,
-                nn::Conv2dConfig {
-                    padding: 1,
-                    ..Default::default()
-                },
-                vs.pp("conv2"),
-            )?)
-            .add(nn::Activation::Relu)
-            .add(nn::conv2d(
-                conv_features,
-                conv_features,
-                3,
-                nn::Conv2dConfig {
-                    padding: 1,
-                    ..Default::default()
-                },
-                vs.pp("conv3"),
-            )?)
-            .add(nn::Activation::Relu);
+            .add(skip(conv_features, vs.pp("conv2"))?)
+            .add(skip(conv_features, vs.pp("conv3"))?);
         let out_net = nn::conv2d(conv_features, 32, 3, Default::default(), vs.pp("conv_out"))?;
         let advantage = nn::seq()
             .add(nn::linear(32, 32, vs.pp("a_ln1"))?)

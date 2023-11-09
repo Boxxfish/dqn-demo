@@ -4,9 +4,8 @@ mod model;
 mod replay_buffer;
 
 use candle_core::{DType, Device, IndexOp, Module, Result, Tensor};
-use candle_nn::{VarBuilder, VarMap};
+use candle_nn::VarBuilder;
 use model::QNet;
-use safetensors::SafeTensors;
 use wasm_bindgen::prelude::*;
 
 use crate::env::{GRID_SIZE, NUM_CHANNELS};
