@@ -305,6 +305,9 @@
   <h1>Deep Q Network Demo</h1>
   <div class="container">
     <div class="game color-dark">
+      <div class="cover {running ? '' : 'visible'}">
+        <p class="color-light bg-dark">Press <b>R</b> to Restart</p>
+      </div>
       {#each cells as row, y}
         {#each row as cell, x}
           <div class="cell bg-primary">
@@ -362,6 +365,25 @@
   .score {
     width: 12rem;
     text-align: center;
+  }
+
+  .cover {
+    display: none;
+    position: absolute;
+    width: 41rem;
+    height: 41rem;
+    background-color: #ffffff88;
+  }
+
+  .cover p {
+    text-align: center;
+    font-size: 2rem;
+    margin-top: 20rem;
+    padding: 2rem;
+  }
+
+  .visible {
+    display: block;
   }
 
   .game {
