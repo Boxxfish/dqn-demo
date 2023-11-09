@@ -303,39 +303,40 @@
 
 <main class="color-dark">
   <h1>Deep Q Network Demo</h1>
-  <div class="episode-status bg-dark color-light">
-    {running ? "RUNNING..." : "EPISODE END"}
-  </div>
-  <div class="game color-dark">
-    {#each cells as row, y}
-      {#each row as cell, x}
-        <div class="cell bg-primary">
-          <div class="cell-icon">
-            <i
-              class="bi {x === agentPos[0] && y === agentPos[1]
-                ? AGENT_ICON
-                : cell > 0
-                ? ICONS[cell - 1]
-                : ''}"
-            />
-            {#if x === agentPos[0] - 1 && y == agentPos[1]}
-              <span class="q-value">{qVals[0]?.toFixed(2)}</span>
-            {/if}
-            {#if x === agentPos[0] + 1 && y == agentPos[1]}
-              <span class="q-value">{qVals[1]?.toFixed(2)}</span>
-            {/if}
-            {#if x === agentPos[0] && y == agentPos[1] - 1}
-              <span class="q-value">{qVals[2]?.toFixed(2)}</span>
-            {/if}
-            {#if x === agentPos[0] && y == agentPos[1] + 1}
-              <span class="q-value">{qVals[3]?.toFixed(2)}</span>
-            {/if}
+  <div class="container">
+    <div class="game color-dark">
+      {#each cells as row, y}
+        {#each row as cell, x}
+          <div class="cell bg-primary">
+            <div class="cell-icon">
+              <i
+                class="bi {x === agentPos[0] && y === agentPos[1]
+                  ? AGENT_ICON
+                  : cell > 0
+                  ? ICONS[cell - 1]
+                  : ''}"
+              />
+              {#if x === agentPos[0] - 1 && y == agentPos[1]}
+                <span class="q-value">{qVals[0]?.toFixed(2)}</span>
+              {/if}
+              {#if x === agentPos[0] + 1 && y == agentPos[1]}
+                <span class="q-value">{qVals[1]?.toFixed(2)}</span>
+              {/if}
+              {#if x === agentPos[0] && y == agentPos[1] - 1}
+                <span class="q-value">{qVals[2]?.toFixed(2)}</span>
+              {/if}
+              {#if x === agentPos[0] && y == agentPos[1] + 1}
+                <span class="q-value">{qVals[3]?.toFixed(2)}</span>
+              {/if}
+            </div>
           </div>
-        </div>
+        {/each}
       {/each}
-    {/each}
+    </div>
+    <div class="score bg-dark color-light">
+      <h1>Score: {score}</h1>
+    </div>
   </div>
-  <p>Score: {score}</p>
   <Policies
     on:toTransition={toTransition}
     on:tabChanged={(e) => (activeTab = e.detail.index)}
@@ -352,6 +353,15 @@
 <style>
   main {
     padding: 1em;
+  }
+
+  .container {
+    display: flex;
+  }
+
+  .score {
+    width: 12rem;
+    text-align: center;
   }
 
   .game {
@@ -401,16 +411,5 @@
   .transition-text {
     display: flex;
     margin: 1rem;
-  }
-
-  .episode-status {
-    padding: 1rem;
-    font-size: 2rem;
-    width: 38.5rem;
-    display: flex;
-  }
-
-  p {
-    font-size: 1.6rem;
   }
 </style>
