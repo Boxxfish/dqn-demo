@@ -320,16 +320,16 @@
                   : ''}"
               />
               {#if x === agentPos[0] - 1 && y == agentPos[1] && qVals[0] !== -Infinity}
-                <span class="q-value">{qVals[0]?.toFixed(2)}</span>
+                <span class="q-value">{(qVals[0] * 10).toFixed(2)}</span>
               {/if}
               {#if x === agentPos[0] + 1 && y == agentPos[1] && qVals[1] !== -Infinity}
-                <span class="q-value">{qVals[1]?.toFixed(2)}</span>
+                <span class="q-value">{(qVals[1] * 10).toFixed(2)}</span>
               {/if}
               {#if x === agentPos[0] && y == agentPos[1] - 1 && qVals[2] !== -Infinity}
-                <span class="q-value">{qVals[2]?.toFixed(2)}</span>
+                <span class="q-value">{(qVals[2] * 10).toFixed(2)}</span>
               {/if}
               {#if x === agentPos[0] && y == agentPos[1] + 1 && qVals[3] !== -Infinity}
-                <span class="q-value">{qVals[3]?.toFixed(2)}</span>
+                <span class="q-value">{(qVals[3] * 10).toFixed(2)}</span>
               {/if}
             </div>
           </div>
