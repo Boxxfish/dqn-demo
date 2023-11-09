@@ -310,7 +310,6 @@
     {#each cells as row, y}
       {#each row as cell, x}
         <div class="cell bg-primary">
-          <span>{y * rowLen + x}</span>
           <div class="cell-icon">
             <i
               class="bi {x === agentPos[0] && y === agentPos[1]
