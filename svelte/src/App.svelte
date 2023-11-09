@@ -306,7 +306,10 @@
   <div class="container">
     <div class="game color-dark">
       <div class="cover {running ? '' : 'visible'}">
-        <p class="color-light bg-dark">Press <b>R</b> to Restart</p>
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <p class="color-light bg-dark" on:click={reset}>
+          Press <b>R</b> to Restart<br />Or Click Here
+        </p>
       </div>
       {#each cells as row, y}
         {#each row as cell, x}
