@@ -168,6 +168,24 @@
     }
   };
 
+  const cellClick = (x: number, y: number) => {
+    const dY = y - agentPos[1];
+    const dX = x - agentPos[0];
+    
+    if (dX === -1 && dY === 0) {
+      step(0);
+    }
+    if (dX === 1 && dY === 0) {
+      step(1);
+    }
+    if (dX === 0 && dY === -1) {
+      step(2);
+    }
+    if (dX === 0 && dY === 1) {
+      step(3);
+    }
+  };
+
   let dqn = null;
   const getState = (cells: number[][], agentPos: Position) => {
     let state = Array(6 * 6 * 6);
@@ -313,7 +331,7 @@
       </div>
       {#each cells as row, y}
         {#each row as cell, x}
-          <div class="cell bg-primary">
+          <div class="cell bg-primary" on:click={() => cellClick(x, y)}>
             <div class="cell-icon">
               <i
                 class="bi {x === agentPos[0] && y === agentPos[1]
