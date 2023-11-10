@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, type ComponentEvents } from "svelte";
+  import { onMount } from "svelte";
   import {
     AGENT_ICON,
     BOX,
@@ -9,6 +9,7 @@
     PIT,
     WALL,
     ICONS,
+    ACTION_ICONS,
     type Position,
     type GameState,
   } from "./constants";
@@ -152,8 +153,7 @@
     }
   };
 
-  const toTransition = (e: ComponentEvents<Policies>["toTransition"]) => {
-    const { index } = e.detail;
+  const toTransition = (index: number) => {
     if (index > 0) {
       cells = [...transitions[index][0][0].map((r) => [...r])];
       agentPos = transitions[index][0][1];
@@ -171,7 +171,7 @@
   const cellClick = (x: number, y: number) => {
     const dY = y - agentPos[1];
     const dX = x - agentPos[0];
-    
+
     if (dX === -1 && dY === 0) {
       step(0);
     }
@@ -321,58 +321,95 @@
 
 <main class="color-dark">
   <h1>Deep Q Network Demo</h1>
-  <div class="container">
-    <div class="game color-dark">
-      <div class="cover {running ? '' : 'visible'}">
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <p class="color-light bg-dark" on:click={reset}>
-          Press <b>R</b> to Restart<br />Or Click Here
-        </p>
-      </div>
-      {#each cells as row, y}
-        {#each row as cell, x}
-          <div class="cell bg-primary" on:click={() => cellClick(x, y)}>
-            <div class="cell-icon">
-              <i
-                class="bi {x === agentPos[0] && y === agentPos[1]
-                  ? AGENT_ICON
-                  : cell > 0
-                  ? ICONS[cell - 1]
-                  : ''}"
-              />
-              {#if x === agentPos[0] - 1 && y == agentPos[1] && qVals[0] !== -Infinity}
-                <span class="q-value">{(qVals[0] * 10).toFixed(2)}</span>
-              {/if}
-              {#if x === agentPos[0] + 1 && y == agentPos[1] && qVals[1] !== -Infinity}
-                <span class="q-value">{(qVals[1] * 10).toFixed(2)}</span>
-              {/if}
-              {#if x === agentPos[0] && y == agentPos[1] - 1 && qVals[2] !== -Infinity}
-                <span class="q-value">{(qVals[2] * 10).toFixed(2)}</span>
-              {/if}
-              {#if x === agentPos[0] && y == agentPos[1] + 1 && qVals[3] !== -Infinity}
-                <span class="q-value">{(qVals[3] * 10).toFixed(2)}</span>
-              {/if}
-            </div>
+  <div>
+    <div class="container">
+      <div>
+        <div class="game color-dark">
+          <div class="cover {running ? '' : 'visible'}">
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <p class="color-light bg-dark" on:click={reset}>
+              Press <b>R</b> to Restart<br />Or Click Here
+            </p>
           </div>
-        {/each}
+          {#each cells as row, y}
+            {#each row as cell, x}
+              <!-- svelte-ignore a11y-click-events-have-key-events -->
+              <div class="cell bg-primary" on:click={() => cellClick(x, y)}>
+                <div class="cell-icon">
+                  <i
+                    class="bi {x === agentPos[0] && y === agentPos[1]
+                      ? AGENT_ICON
+                      : cell > 0
+                      ? ICONS[cell - 1]
+                      : ''}"
+                  />
+                  {#if x === agentPos[0] - 1 && y == agentPos[1] && qVals[0] !== -Infinity}
+                    <span class="q-value">{(qVals[0] * 10).toFixed(2)}</span>
+                  {/if}
+                  {#if x === agentPos[0] + 1 && y == agentPos[1] && qVals[1] !== -Infinity}
+                    <span class="q-value">{(qVals[1] * 10).toFixed(2)}</span>
+                  {/if}
+                  {#if x === agentPos[0] && y == agentPos[1] - 1 && qVals[2] !== -Infinity}
+                    <span class="q-value">{(qVals[2] * 10).toFixed(2)}</span>
+                  {/if}
+                  {#if x === agentPos[0] && y == agentPos[1] + 1 && qVals[3] !== -Infinity}
+                    <span class="q-value">{(qVals[3] * 10).toFixed(2)}</span>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          {/each}
+        </div>
+        <div class="score bg-dark color-light">
+          <h1>Score: {score}</h1>
+        </div>
+      </div>
+    </div>
+    <Policies
+      on:tabChanged={(e) => (activeTab = e.detail.index)}
+      on:run={runDQN}
+      on:pause={pauseDQN}
+      {activeTab}
+      {runningDQN}
+    />
+    <div class="transitions">
+      {#each transitions as transition, i}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <div class="transition" on:click={() => toTransition(i)}>
+          <div class="state">
+            {#each transition[0][0] as row, y}
+              {#each row as cell, x}
+                <div class="cell-mini bg-primary">
+                  <div class="cell-icon-mini">
+                    <i
+                      class="bi {x === transition[0][1][0] &&
+                      y === transition[0][1][1]
+                        ? AGENT_ICON
+                        : cell > 0
+                        ? ICONS[cell - 1]
+                        : ''}"
+                    />
+                  </div>
+                </div>
+              {/each}
+            {/each}
+          </div>
+          <div class="action">
+            <i class="bi {ACTION_ICONS[transition[1]]}" />
+          </div>
+          <div class="transition-text">
+            {transition[2] > 0 ? "+" : ""}{transition[2]}
+          </div>
+          {#if transition[3]}
+            <div class="transition-text">Done</div>
+          {/if}
+        </div>
       {/each}
     </div>
-    <div class="score bg-dark color-light">
-      <h1>Score: {score}</h1>
-    </div>
   </div>
-  <Policies
-    on:toTransition={toTransition}
-    on:tabChanged={(e) => (activeTab = e.detail.index)}
-    on:run={runDQN}
-    on:pause={pauseDQN}
-    {transitions}
-    {activeTab}
-    {runningDQN}
-  />
 </main>
 
-<svelte:window on:keydown={onKeyDown} />
+<svelte:window on:keydown|preventDefault={onKeyDown} />
 
 <style>
   main {
@@ -381,6 +418,13 @@
 
   .container {
     display: flex;
+    flex-direction: row;
+  }
+
+  @media only screen and (max-width: 50rem) {
+    .container {
+      flex-direction: column;
+    }
   }
 
   .score {
@@ -409,6 +453,7 @@
 
   .game {
     width: 41rem;
+    height: 41rem;
     margin: 0;
     padding: 0;
     display: flex;
@@ -441,6 +486,12 @@
     align-items: center;
   }
 
+  .transitions {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+  }
+
   .transition {
     display: flex;
     align-items: center;
@@ -454,5 +505,48 @@
   .transition-text {
     display: flex;
     margin: 1rem;
+  }
+
+  .transition {
+    display: flex;
+    align-items: center;
+    font-size: 2rem;
+    padding: 1rem;
+    margin: 1rem;
+    box-shadow: 0 0 0.2rem black;
+    cursor: pointer;
+  }
+
+  .transition-text {
+    display: flex;
+    margin: 1rem;
+  }
+
+  .state {
+    display: flex;
+    flex-wrap: wrap;
+    width: 8rem;
+  }
+
+  .cell-mini {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .cell-icon-mini {
+    font-size: 1rem;
+    text-align: center;
+    align-content: center;
+  }
+
+  .action {
+    padding: 1rem;
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+  }
+
+  p {
+    font-size: 1.6rem;
   }
 </style>

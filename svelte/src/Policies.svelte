@@ -1,11 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import ManualPolicy from "./ManualPolicy.svelte";
-  import type { GameState } from "./constants";
   import DqnPolicy from "./DQNPolicy.svelte";
   const dispatch = createEventDispatcher();
 
-  export let transitions: [GameState, number, number, boolean][] = [];
   export let runningDQN;
   export let activeTab = 0;
 
@@ -40,9 +38,7 @@
       <div class="box">
         <svelte:component
           this={activeItem.component}
-          {transitions}
           {runningDQN}
-          on:toTransition={(e) => dispatch("toTransition", e.detail)}
           on:run={() => dispatch("run")}
           on:pause={() => dispatch("pause")}
         />
