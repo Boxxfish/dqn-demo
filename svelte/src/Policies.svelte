@@ -48,6 +48,7 @@
 </div>
 
 <style>
+
   ul {
     display: flex;
     list-style: none;
@@ -62,5 +63,9 @@
 
   li:hover {
     outline: solid 1px black;
+  }
+
+  .box {
+    display: flex;
   }
 </style>

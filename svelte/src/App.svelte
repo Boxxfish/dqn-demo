@@ -323,7 +323,6 @@
   <h1>Deep Q Network Demo</h1>
   <div>
     <div class="container">
-      <div>
         <div class="game color-dark">
           <div class="cover {running ? '' : 'visible'}">
             <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -363,20 +362,20 @@
         <div class="score bg-dark color-light">
           <h1>Score: {score}</h1>
         </div>
-      </div>
-    </div>
+        
     <Policies
-      on:tabChanged={(e) => (activeTab = e.detail.index)}
-      on:run={runDQN}
-      on:pause={pauseDQN}
-      {activeTab}
-      {runningDQN}
-    />
+    on:tabChanged={(e) => (activeTab = e.detail.index)}
+    on:run={runDQN}
+    on:pause={pauseDQN}
+    {activeTab}
+    {runningDQN}
+  />
+    </div>
     <div class="transitions">
       {#each transitions as transition, i}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div class="transition" on:click={() => toTransition(i)}>
-          <div class="state">
+        <div class="transition">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <div class="state" on:click={() => toTransition(i)}>
             {#each transition[0][0] as row, y}
               {#each row as cell, x}
                 <div class="cell-mini bg-primary">
@@ -394,11 +393,18 @@
               {/each}
             {/each}
           </div>
-          <div class="action">
-            <i class="bi {ACTION_ICONS[transition[1]]}" />
-          </div>
-          <div class="transition-text">
-            {transition[2] > 0 ? "+" : ""}{transition[2]}
+          <div class="transition-info-container">
+            <div class="transition-info">
+              <div class="action">
+                <i class="bi {ACTION_ICONS[transition[1]]}" />
+              </div>
+              <div class="transition-text">
+                {transition[2] >= 0 ? "+" : ""}{transition[2]}
+              </div>
+            </div>
+            <div class="transition-arrow">
+              <i class="bi {ACTION_ICONS[1]}" />
+            </div>
           </div>
           {#if transition[3]}
             <div class="transition-text">Done</div>
@@ -414,11 +420,14 @@
 <style>
   main {
     padding: 1em;
+    text-align: center;
   }
 
   .container {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
+    margin: auto;
+    align-items: center;
   }
 
   @media only screen and (max-width: 50rem) {
@@ -428,6 +437,7 @@
   }
 
   .score {
+    padding: 0.4rem;
     width: 12rem;
     text-align: center;
   }
@@ -435,9 +445,9 @@
   .cover {
     display: none;
     position: absolute;
-    width: 41rem;
-    height: 41rem;
-    background-color: #ffffff88;
+    width: 40.8rem;
+    height: 40.8rem;
+    background-color: #00000045;
   }
 
   .cover p {
@@ -458,6 +468,7 @@
     padding: 0;
     display: flex;
     flex-wrap: wrap;
+    margin: auto;
   }
 
   .cell {
@@ -496,25 +507,29 @@
     display: flex;
     align-items: center;
     font-size: 2rem;
-    padding: 1rem;
-    margin: 1rem;
-    box-shadow: 0 0 0.2rem black;
-    cursor: pointer;
+  }
+
+  .transition-info-container {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .transition-info {
+    display: flex;
+    flex-direction: row;
+    font-size: 1rem;
+    justify-items: center;
+    align-items: center;
+  }
+
+  .transition-arrow {
+    font-size: 4rem;
+    text-align: center;
   }
 
   .transition-text {
     display: flex;
     margin: 1rem;
-  }
-
-  .transition {
-    display: flex;
-    align-items: center;
-    font-size: 2rem;
-    padding: 1rem;
-    margin: 1rem;
-    box-shadow: 0 0 0.2rem black;
-    cursor: pointer;
   }
 
   .transition-text {
@@ -526,6 +541,7 @@
     display: flex;
     flex-wrap: wrap;
     width: 8rem;
+    cursor: pointer;
   }
 
   .cell-mini {
