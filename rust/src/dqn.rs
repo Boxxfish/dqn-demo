@@ -57,7 +57,11 @@ pub fn train_dqn<M: Module, O: Optimizer>(
             .gather(&actions.unsqueeze(1)?, 1)?
             .squeeze(1)?;
         let diff = (q_target - &q_pred)?;
-        let q_loss = ((1. / probs)?.powf(priority) * (&diff * &diff)?)?.mean(0)?;
+        let q_loss = (
+            // (1. / probs)?.powf(priority) * 
+            (&diff * &diff)
+            // ?
+        )?.mean(0)?;
         q_opt.backward_step(&q_loss)?;
         total_q_loss += q_loss.to_scalar::<f32>()?;
         buffer.update_errors(&indices, &diff.to_vec1()?)

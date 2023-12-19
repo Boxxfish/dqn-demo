@@ -117,7 +117,9 @@ impl ReplayBuffer {
         let probs: Vec<_> = self
             .priorities
             .iter()
-            .map(|p| *p / sum_priorities)
+            .map(|p| 1.
+                // *p / sum_priorities
+            )
             .collect();
         let indices: Vec<_> = sample_weighted(&mut rng, self.capacity, |i| probs[i], batch_size)
             .unwrap()
